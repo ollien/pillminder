@@ -1,9 +1,14 @@
 defmodule Pillminder do
-  @interval_ms 5000
+  alias Pillminder.RunInterval
 
-  use Application
+  @spec send_reminders(:timer.time()) :: :ok | {:error, any}
+  def send_reminders(interval) do
+    timer_start_res =
+      RunInterval.apply_interval(interval, &Pillminder.ReminderServer.send_reminder/0)
 
-  @impl true
-  def start(_type, _args) do
+    case timer_start_res do
+      {:ok, _} -> :ok
+      {:error, err} -> {:error, err}
+    end
   end
 end
