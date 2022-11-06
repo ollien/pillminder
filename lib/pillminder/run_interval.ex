@@ -3,7 +3,7 @@ defmodule Pillminder.RunInterval do
   Run the given function on the given interval. This is a thin wrapper around :timer.apply_interval/4
   to allow greater flexibility with Elixir.
   """
-  @spec apply_interval(:timer.time(), function, list) ::
+  @spec apply_interval(non_neg_integer, function, list) ::
           {:error, any} | {:ok, :timer.tref()}
   def apply_interval(time, function) do
     apply_interval(time, function, [])
