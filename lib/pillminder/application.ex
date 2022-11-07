@@ -15,7 +15,10 @@ defmodule Pillminder.Application do
            Application.fetch_env!(:pillminder, :ntfy_topic),
            %{title: "this is a test"}
          )
-       end}
+       end},
+
+      # TODO: Add port to config file
+      {Plug.Cowboy, scheme: :http, plug: Pillminder.WebRouter, options: [port: 8000]}
     ]
 
     {:ok, supervisor_pid} =
