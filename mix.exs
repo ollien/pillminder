@@ -21,7 +21,10 @@ defmodule Pillminder.MixProject do
   end
 
   defp deps do
-    []
+    [
+      {:httpoison, "~> 1.8"},
+      {:poison, "~> 5.0"}
+    ]
   end
 
   defp aliases do

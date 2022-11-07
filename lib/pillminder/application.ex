@@ -1,14 +1,21 @@
 defmodule Pillminder.Application do
   alias Pillminder.ReminderServer
 
-  @interval_ms 5 * 60 * 60
+  # 5 * 60 * 60
+  @interval_ms 5000
 
   use Application
 
   @impl true
   def start(_type, _args) do
     children = [
-      {ReminderServer, &print/0}
+      {ReminderServer,
+       fn ->
+         Pillminder.Ntfy.push_notification(
+           Application.fetch_env!(:pillminder, :ntfy_topic),
+           %{title: "this is a test"}
+         )
+       end}
     ]
 
     {:ok, supervisor_pid} =
@@ -17,9 +24,5 @@ defmodule Pillminder.Application do
     :ok = Pillminder.send_reminders(@interval_ms)
 
     {:ok, supervisor_pid}
-  end
-
-  defp print() do
-    IO.puts("Would send reminder...")
   end
 end
