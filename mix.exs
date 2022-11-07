@@ -23,7 +23,8 @@ defmodule Pillminder.MixProject do
   defp deps do
     [
       {:httpoison, "~> 1.8"},
-      {:poison, "~> 5.0"}
+      {:poison, "~> 5.0"},
+      {:uuid, "~> 1.1"}
     ]
   end
 
