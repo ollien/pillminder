@@ -7,7 +7,8 @@ defmodule Pillminder.WebRouter do
   plug(:dispatch)
 
   delete "/timer/:timer_id" do
-    dismiss_res = ReminderServer.dismiss_reminder(timer_id)
+    # TODO: Use this timer ID
+    dismiss_res = ReminderServer.dismiss()
 
     case dismiss_res do
       :ok -> send_resp(conn, 200, "")

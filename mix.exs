@@ -24,7 +24,6 @@ defmodule Pillminder.MixProject do
     [
       {:httpoison, "~> 1.8"},
       {:poison, "~> 5.0"},
-      {:uuid, "~> 1.1"},
       {:plug, "~> 1.13"},
       {:plug_cowboy, "~> 2.6"}
     ]

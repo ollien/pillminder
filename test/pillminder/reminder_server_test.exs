@@ -17,7 +17,7 @@ defmodule PillminderTest.ReminderServer do
 
     start_supervised!({ReminderServer, fn -> send(proc, :called) end})
 
-    {:ok, _timer_id} = ReminderServer.send_reminder_on_interval(50)
+    :ok = ReminderServer.send_reminder_on_interval(50)
 
     # Imperfect, but by calling multiple times we can assume we are being called on an interval
     assert_receive(:called, 100)
@@ -25,16 +25,30 @@ defmodule PillminderTest.ReminderServer do
     assert_receive(:called, 100)
   end
 
+  test "can not start interval twice" do
+    proc = self()
+
+    start_supervised!({ReminderServer, fn -> send(proc, :called) end})
+
+    :ok = ReminderServer.send_reminder_on_interval(50)
+    {:error, :already_timing} = ReminderServer.send_reminder_on_interval(50)
+  end
+
   test "can cancel timer" do
     proc = self()
     interval = 50
 
     start_supervised!({ReminderServer, fn -> send(proc, :called) end})
-    {:ok, timer_id} = ReminderServer.send_reminder_on_interval(interval)
+    :ok = ReminderServer.send_reminder_on_interval(interval)
 
     assert_receive(:called, 100)
-    :ok = ReminderServer.dismiss_reminder(timer_id)
+    :ok = ReminderServer.dismiss()
     assert_not_received_after(:called, interval)
+  end
+
+  test "cannot cancel when timer is not running" do
+    start_supervised!({ReminderServer, fn -> nil end})
+    {:error, :no_timer} = ReminderServer.dismiss()
   end
 
   defp assert_not_received_after(to_match, timeout) do

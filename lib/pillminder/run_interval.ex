@@ -21,7 +21,7 @@ defmodule Pillminder.RunInterval do
   @doc """
   Cancel the given timer_ref. This is a thin wrapper around :timer.cancel
   """
-  @spec cancel(:timer.timer_ref()) :: :ok | {:error, any}
+  @spec cancel(:timer.tref()) :: :ok | {:error, any}
   def cancel(timer_ref) do
     cancel_res = :timer.cancel(timer_ref)
 
