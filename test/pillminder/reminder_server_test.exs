@@ -66,23 +66,7 @@ defmodule PillminderTest.ReminderServer do
   end
 
   defp assert_not_received_after(to_match, timeout) do
-    assert_not_received_after(to_match, timeout, 0)
-  end
-
-  defp assert_not_received_after(to_match, timeout, elapsed) when elapsed > timeout do
-    refute_receive(^to_match)
-  end
-
-  defp assert_not_received_after(to_match, timeout, elapsed) do
-    start = DateTime.now!("Etc/UTC")
-
     receive do
-      ^to_match when elapsed < timeout ->
-        time_taken =
-          DateTime.now!("Etc/UTC")
-          |> DateTime.diff(start, :millisecond)
-
-        assert_not_received_after(to_match, timeout, elapsed + time_taken)
     after
       timeout -> refute_receive(^to_match)
     end
