@@ -8,9 +8,14 @@ defmodule Pillminder.ReminderServer do
           timer: :timer.tref() | :no_timer
         }
 
-  @spec start_link(function, keyword) :: {:error, any} | {:ok, pid} | {:error, any} | :ignore
-  def start_link(remind_func, opts \\ []) do
-    full_opts = Keyword.merge([name: __MODULE__], opts)
+  def start_link({remind_func}) do
+    start_link({remind_func, []})
+  end
+
+  @spec start_link({function, GenServer.options()}) ::
+          {:ok, pid} | {:error, any} | :ignore
+  def start_link({remind_func, opts}) do
+    full_opts = Keyword.put_new(opts, :name, __MODULE__)
     GenServer.start_link(__MODULE__, remind_func, full_opts)
   end
 
@@ -18,27 +23,31 @@ defmodule Pillminder.ReminderServer do
     Call the reminder every interval milliseconds. An error is returned if the calling interval could not
     be set up; the remind_func will not be called if this happens.
   """
-  @spec send_reminder_on_interval(non_neg_integer | :infinity) ::
+  @spec send_reminder_on_interval(non_neg_integer | :infinity, server_name: GenServer.name()) ::
           :ok | {:error, :already_timing | any}
-  def send_reminder_on_interval(interval) do
-    GenServer.call(__MODULE__, {:setup_reminder, interval})
+  def send_reminder_on_interval(interval, opts \\ []) do
+    destination = Keyword.get(opts, :server_name, __MODULE__)
+    GenServer.call(destination, {:setup_reminder, interval, destination})
   end
 
   @doc """
     Call the reminder every interval milliseconds. An error is returned if there is no timer currently running,
     or the timer failed to cancel.
   """
-  @spec dismiss() :: :ok | {:error, :no_timer | any}
-  def dismiss() do
-    GenServer.call(__MODULE__, :dismiss)
+  @spec dismiss(server_name: GenServer.name()) :: :ok | {:error, :no_timer | any}
+  def dismiss(opts \\ []) do
+    destination = Keyword.get(opts, :server_name, __MODULE__)
+    GenServer.call(destination, :dismiss)
   end
 
   @doc """
     Cal the reminder func, with a given timeout in milliseconds
   """
-  @spec send_reminder(non_neg_integer | :infinity) :: any
-  def send_reminder(timeout \\ 5000) do
-    GenServer.call(__MODULE__, :remind, timeout)
+  @spec send_reminder(timeout: non_neg_integer | :infinity, server_name: GenServer.name()) :: any
+  def send_reminder(opts \\ []) do
+    destination = Keyword.get(opts, :server_name, __MODULE__)
+    timeout = Keyword.get(opts, :timeout, 5000)
+    GenServer.call(destination, :remind, timeout)
   end
 
   @impl true
@@ -54,14 +63,13 @@ defmodule Pillminder.ReminderServer do
     {:reply, ret, state}
   end
 
-  @impl true
-  @spec handle_call({:setup_reminder, non_neg_integer}, {pid, term}, state) ::
+  @spec handle_call({:setup_reminder, non_neg_integer, GenServer.name()}, {pid, term}, state) ::
           {:reply, :ok, state}
           | {:reply, {:error, :already_timing | any}, state}
-  def handle_call({:setup_reminder, interval}, _from, state) do
+  def handle_call({:setup_reminder, interval, destination}, _from, state) do
     send_reminder_fn = fn ->
       # We want to time out the call once our next interval hits
-      __MODULE__.send_reminder(interval)
+      __MODULE__.send_reminder(timeout: interval, server_name: destination)
     end
 
     with {:ok, timer_ref} <- RunInterval.apply_interval(interval, send_reminder_fn),
