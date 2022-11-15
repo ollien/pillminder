@@ -3,8 +3,9 @@ defmodule Pillminder.ReminderServer do
 
   use GenServer
 
+  @type remind_func :: (() -> any)
   @type state :: %{
-          remind_func: function,
+          remind_func: remind_func,
           timer: :timer.tref() | :no_timer
         }
 
@@ -12,7 +13,7 @@ defmodule Pillminder.ReminderServer do
     start_link({remind_func, []})
   end
 
-  @spec start_link({function, GenServer.options()}) ::
+  @spec start_link({remind_func, GenServer.options()}) ::
           {:ok, pid} | {:error, any} | :ignore
   def start_link({remind_func, opts}) do
     full_opts = Keyword.put_new(opts, :name, __MODULE__)
@@ -51,7 +52,7 @@ defmodule Pillminder.ReminderServer do
   end
 
   @impl true
-  @spec init(function) :: {:ok, state}
+  @spec init(remind_func) :: {:ok, state}
   def init(remind_func) do
     {:ok, %{remind_func: remind_func, timer: :no_timer}}
   end
