@@ -7,11 +7,9 @@ defmodule Pillminder.Util.Time do
     "spring forward" day will happen at 3am, which is the same "time"
   """
   @spec get_next_occurrence_of_time(
-          now :: Timex.Types.valid_datetime(),
+          now :: DateTime.t(),
           target_time :: Time.t()
-        ) ::
-          Timex.Types.valid_datetime()
-          | {:error, term}
+        ) :: DateTime.t() | {:error, any}
   def get_next_occurrence_of_time(now, target_time) do
     case set_time_in_date(now, target_time) do
       err = {:error, _} -> err
@@ -19,6 +17,7 @@ defmodule Pillminder.Util.Time do
     end
   end
 
+  @spec set_time_in_date(DateTime.t(), Time.t()) :: DateTime.t() | {:error, any}
   defp set_time_in_date(now, target_time) do
     time_as_duration = Timex.Duration.from_time(target_time)
 
@@ -29,14 +28,14 @@ defmodule Pillminder.Util.Time do
       #
       # (I also don't know that there's an ambiguous case here so I'm going to fall back to the default)
       %Timex.AmbiguousDateTime{after: after_set_time} -> after_set_time
-      set_time -> set_time
+      set_time = %DateTime{} -> set_time
     end
   end
 
   @spec select_time(
-          now :: Timex.Types.valid_datetime(),
-          candidate :: Timex.Types.valid_datetime()
-        ) :: Timex.Types.valid_datetime()
+          now :: DateTime.t(),
+          candidate :: DateTime.t()
+        ) :: DateTime.t()
   defp select_time(now, candidate) do
     if Timex.after?(now, candidate) do
       # If we've already passed the candidate time, add one day and resolve the ambiguity if needed
