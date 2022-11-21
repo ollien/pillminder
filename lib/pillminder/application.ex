@@ -71,7 +71,12 @@ defmodule Pillminder.Application do
   end
 
   @spec make_reminder_server_id(Config.Timer) :: String.t()
-  defp make_reminder_server_id(timer) do
-    "ReminderServer:#{timer.id}"
+  def make_reminder_server_id(timer = %Config.Timer{}) do
+    make_reminder_server_id(timer.id)
+  end
+
+  @spec make_reminder_server_id(String.t()) :: String.t()
+  def make_reminder_server_id(name) do
+    "ReminderServer:#{name}"
   end
 end
