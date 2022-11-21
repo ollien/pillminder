@@ -47,7 +47,7 @@ defmodule Pillminder.Scheduler do
 
     Enum.each(to_schedule, fn {reminder, schedule_time} ->
       {:ok, ms_until} = get_ms_until(now, schedule_time)
-      schedule_reminder(reminder, ms_until)
+      schedule_reminder(reminder, ms_until, clock_source)
     end)
   end
 
@@ -89,7 +89,7 @@ defmodule Pillminder.Scheduler do
   end
 
   @spec get_next_scheduleable_time(reminder :: scheduled_reminder(), now :: DateTime.t()) ::
-          {:ok, {scheduled_reminder(), DateTime.t()}} | {:error, String.t()}
+          {:ok, DateTime.t()} | {:error, String.t()}
   defp get_next_scheduleable_time(reminder, now) do
     Util.Time.get_next_occurrence_of_time(now, reminder.start_time) |> ok_or()
   end
@@ -108,18 +108,25 @@ defmodule Pillminder.Scheduler do
     end
   end
 
-  defp schedule_reminder(reminder, time_until) do
-    :timer.apply_after(
-      time_until,
-      :erlang,
-      :apply,
-      [reminder.scheduled_func, []]
-    )
+  @spec schedule_reminder(scheduled_reminder(), non_neg_integer(), clock_source()) :: :ok
+  defp schedule_reminder(reminder, ms_until, clock_source) do
+    # TODO: We should cancel the tref after crashes or something
+    {:ok, _} =
+      :timer.apply_after(
+        ms_until,
+        :erlang,
+        :apply,
+        # We must use :erlang.apply if we want to use a private function here
+        [fn -> run_and_reschedule(reminder, clock_source) end, []]
+      )
+  end
 
-    # TODO: This needs to reschedule the task for the next schedulable time.
-    # This shouldn't be too bad, but testing will be difficult and I want to think carefully about it.
-    # Given that apply_after spawns a new task, if it fails we're going to be in a difficult positin.
-    # Maybe we can refactor this so that we call a genserver, so that if it fails, everything goes down and gets
-    # scheduled.
+  defp run_and_reschedule(reminder, clock_source) do
+    reminder.scheduled_func.()
+
+    now = clock_source.()
+    {:ok, schedule_time} = get_next_scheduleable_time(reminder, now)
+    {:ok, ms_until} = get_ms_until(now, schedule_time)
+    schedule_reminder(reminder, ms_until, clock_source)
   end
 end
