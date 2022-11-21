@@ -40,9 +40,15 @@ defmodule Pillminder.Application do
       {
         ReminderServer,
         {fn ->
-           Pillminder.Ntfy.push_notification(timer.ntfy_topic, %{
-             title: "this is a test for timer id #{timer.id}"
-           })
+           Logger.debug("Sending notification request to ntfy for #{timer.id}")
+
+           {:ok, resp} =
+             Pillminder.Ntfy.push_notification(
+               timer.ntfy_topic,
+               Pillminder.make_notification_body(timer)
+             )
+
+           Logger.debug("Got response from ntfy: #{inspect(resp)}")
          end, name: reminder_server_via_tuple(timer)}
       },
       id: make_reminder_server_id(timer)
