@@ -115,8 +115,13 @@ defmodule Pillminder.Scheduler do
 
   @spec run_and_reschedule(pid, scheduled_reminder(), clock_source()) :: :ok
   defp run_and_reschedule(supervisor, reminder, clock_source) do
-    Task.Supervisor.async_nolink(supervisor, reminder.scheduled_func)
-    wait_for_completion()
+    supervised_task = Task.Supervisor.async_nolink(supervisor, reminder.scheduled_func)
+    # TODO: Should we pick a timeout here?
+    case Task.yield(supervised_task, :infinity) do
+      {:ok, _} -> Logger.debug("Reminder task completed")
+      {:exit, :normal} -> Logger.debug("Reminder task completed")
+      {:exit, reason} -> Logger.error("Reminder task failed: #{inspect(reason)}")
+    end
 
     # The only other possible return values for this are :ignore and :already_started, neither of which
     # can happen here.
@@ -130,22 +135,6 @@ defmodule Pillminder.Scheduler do
       )
 
     :ok
-  end
-
-  @spec wait_for_completion() :: :ok | {:error, any}
-  defp wait_for_completion() do
-    receive do
-      {:DOWN, _ref, :process, _pid, :normal} ->
-        Logger.debug("Reminder task completed")
-
-      {:DOWN, _ref, :process, _pid, reason} ->
-        Logger.error("Reminder task failed: #{inspect(reason)}")
-        {:error, reason}
-
-      {_ref, _result} ->
-        Logger.debug("Reminder task completed")
-        :ok
-    end
   end
 
   @spec reschedule_reminder(pid, scheduled_reminder(), clock_source()) :: :ok
