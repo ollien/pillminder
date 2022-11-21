@@ -94,6 +94,13 @@ defmodule Pillminder.Scheduler do
           clock_source()
         ) :: :ok
   defp schedule_reminder(supervisor, reminder, ms_until, clock_source) do
+    minutes_until =
+      Timex.Duration.from_milliseconds(ms_until)
+      |> Timex.Duration.to_minutes()
+      |> (&:io_lib.format("~.2f", [&1])).()
+
+    Logger.debug("Scheduling reminder for #{reminder.start_time} (in #{minutes_until} minutes))")
+
     {:ok, _} =
       :timer.apply_after(
         ms_until,
