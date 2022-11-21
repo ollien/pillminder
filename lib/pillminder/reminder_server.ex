@@ -24,7 +24,7 @@ defmodule Pillminder.ReminderServer do
     Call the reminder every interval milliseconds. An error is returned if the calling interval could not
     be set up; the remind_func will not be called if this happens.
   """
-  @spec send_reminder_on_interval(non_neg_integer | :infinity, server_name: GenServer.name()) ::
+  @spec send_reminder_on_interval(non_neg_integer | :infinity, server_name: GenServer.server()) ::
           :ok | {:error, :already_timing | any}
   def send_reminder_on_interval(interval, opts \\ []) do
     destination = Keyword.get(opts, :server_name, __MODULE__)
@@ -35,7 +35,7 @@ defmodule Pillminder.ReminderServer do
     Call the reminder every interval milliseconds. An error is returned if there is no timer currently running,
     or the timer failed to cancel.
   """
-  @spec dismiss(server_name: GenServer.name()) :: :ok | {:error, :no_timer | any}
+  @spec dismiss(server_name: GenServer.server()) :: :ok | {:error, :no_timer | any}
   def dismiss(opts \\ []) do
     destination = Keyword.get(opts, :server_name, __MODULE__)
     GenServer.call(destination, :dismiss)
@@ -44,7 +44,8 @@ defmodule Pillminder.ReminderServer do
   @doc """
     Cal the reminder func, with a given timeout in milliseconds
   """
-  @spec send_reminder(timeout: non_neg_integer | :infinity, server_name: GenServer.name()) :: any
+  @spec send_reminder(timeout: non_neg_integer | :infinity, server_name: GenServer.server()) ::
+          any
   def send_reminder(opts \\ []) do
     destination = Keyword.get(opts, :server_name, __MODULE__)
     timeout = Keyword.get(opts, :timeout, 5000)
@@ -64,7 +65,7 @@ defmodule Pillminder.ReminderServer do
     {:reply, ret, state}
   end
 
-  @spec handle_call({:setup_reminder, non_neg_integer, GenServer.name()}, {pid, term}, state) ::
+  @spec handle_call({:setup_reminder, non_neg_integer, GenServer.server()}, {pid, term}, state) ::
           {:reply, :ok, state}
           | {:reply, {:error, :already_timing | any}, state}
   def handle_call({:setup_reminder, interval, destination}, _from, state) do
