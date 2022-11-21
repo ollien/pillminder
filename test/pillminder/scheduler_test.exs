@@ -1,7 +1,7 @@
 defmodule PillminderTest.Scheduler do
   alias Pillminder.Scheduler
 
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   doctest Pillminder.Scheduler
 
   setup do

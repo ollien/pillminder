@@ -1,7 +1,7 @@
 defmodule PillminderTest.RunInterval do
   alias Pillminder.RunInterval
 
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   doctest Pillminder.RunInterval
 
   test "calls target function repeatedly" do

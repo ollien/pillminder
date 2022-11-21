@@ -1,7 +1,7 @@
 defmodule PillminderTest.ReminderServer do
   alias Pillminder.ReminderServer
 
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   doctest Pillminder.ReminderServer
 
   test "calls target function when send_reminder is called" do
