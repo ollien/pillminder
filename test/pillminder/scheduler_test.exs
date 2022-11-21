@@ -4,6 +4,12 @@ defmodule PillminderTest.Scheduler do
   use ExUnit.Case
   doctest Pillminder.Scheduler
 
+  setup do
+    # Start tzdata, as the test's Timex needs it. test.exs disables network calls for this.
+    {:ok, _} = Application.ensure_all_started(:tzdata)
+    :ok
+  end
+
   test "runs task at specified time" do
     this_pid = self()
 
