@@ -1,6 +1,6 @@
 defmodule Pillminder.Scheduler do
   alias Pillminder.Util
-  use GenServer
+  use Task
 
   @type clock_source :: (() -> DateTime.t())
   @type init_options :: [clock_source: clock_source()]
@@ -10,38 +10,14 @@ defmodule Pillminder.Scheduler do
           scheduled_func: (() -> any())
         }
 
-  @spec start_link({[scheduled_reminder()], init_options()}) ::
-          :ignore | {:error, any} | {:ok, pid}
+  @spec start_link({[scheduled_reminder()], init_options()}) :: {:ok, pid}
   def start_link({reminders, opts}) do
-    GenServer.start(__MODULE__, {reminders, opts}, name: __MODULE__)
+    Task.start(__MODULE__, :schedule_reminders, [reminders, opts])
   end
 
-  @impl true
-  @spec init({[scheduled_reminder()], init_options()}) :: {:ok, state()}
-  def init({reminders, opts}) do
-    state = %{
-      clock_source: Keyword.get(opts, :clock_source, &now!/0)
-    }
-
-    Process.send_after(__MODULE__, {:schedule_reminders, reminders}, 0)
-    {:ok, state}
-  end
-
-  @impl true
-  def handle_info({:schedule_reminders, reminders}, state) do
-    :ok = schedule_reminders(reminders, state.clock_source)
-
-    {:noreply, state}
-  end
-
-  @impl true
-  def handle_call({:schedule_reminders, reminders}, _from, state) do
-    reply = schedule_reminders(reminders, state.clock_source)
-    {:reply, reply, state}
-  end
-
-  @spec schedule_reminders([scheduled_reminder()], clock_source()) :: :ok
-  defp schedule_reminders(reminders, clock_source) do
+  @spec schedule_reminders([scheduled_reminder()], init_options()) :: :ok
+  def schedule_reminders(reminders, opts \\ []) do
+    clock_source = Keyword.get(opts, :clock_source, &now!/0)
     now = clock_source.()
     {:ok, to_schedule} = get_next_scheduleable_times(reminders, now)
 
@@ -110,7 +86,6 @@ defmodule Pillminder.Scheduler do
 
   @spec schedule_reminder(scheduled_reminder(), non_neg_integer(), clock_source()) :: :ok
   defp schedule_reminder(reminder, ms_until, clock_source) do
-    # TODO: We should cancel the tref after crashes or something
     {:ok, _} =
       :timer.apply_after(
         ms_until,
@@ -119,9 +94,12 @@ defmodule Pillminder.Scheduler do
         # We must use :erlang.apply if we want to use a private function here
         [fn -> run_and_reschedule(reminder, clock_source) end, []]
       )
+
+    :ok
   end
 
   defp run_and_reschedule(reminder, clock_source) do
+    # TODO: Run this as a spawn_monitor
     reminder.scheduled_func.()
 
     now = clock_source.()
