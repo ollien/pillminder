@@ -1,22 +1,47 @@
 defmodule Pillminder.Scheduler do
   alias Pillminder.Util
-  use Task
+  use GenServer
 
-  @type init_options :: [clock_source: (() -> DateTime.t())]
+  @type clock_source :: (() -> DateTime.t())
+  @type init_options :: [clock_source: clock_source()]
+  @type state :: %{clock_source: clock_source()}
   @type scheduled_reminder :: %{
           start_time: Time.t(),
           scheduled_func: (() -> any())
         }
 
-  @spec start_link({[scheduled_reminder()], init_options()}) :: {:ok, pid}
+  @spec start_link({[scheduled_reminder()], init_options()}) ::
+          :ignore | {:error, any} | {:ok, pid}
   def start_link({reminders, opts}) do
-    Task.start(__MODULE__, :schedule_reminders, [reminders, opts])
+    GenServer.start(__MODULE__, {reminders, opts}, name: __MODULE__)
   end
 
-  @spec schedule_reminders([scheduled_reminder()], init_options()) :: :ok
-  def schedule_reminders(reminders, opts \\ []) do
-    clock_source = Keyword.get(opts, :clock_source, &now!/0)
+  @impl true
+  @spec init({[scheduled_reminder()], init_options()}) :: {:ok, state()}
+  def init({reminders, opts}) do
+    state = %{
+      clock_source: Keyword.get(opts, :clock_source, &now!/0)
+    }
 
+    Process.send_after(__MODULE__, {:schedule_reminders, reminders}, 0)
+    {:ok, state}
+  end
+
+  @impl true
+  def handle_info({:schedule_reminders, reminders}, state) do
+    :ok = schedule_reminders(reminders, state.clock_source)
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_call({:schedule_reminders, reminders}, _from, state) do
+    reply = schedule_reminders(reminders, state.clock_source)
+    {:reply, reply, state}
+  end
+
+  @spec schedule_reminders([scheduled_reminder()], clock_source()) :: :ok
+  defp schedule_reminders(reminders, clock_source) do
     now = clock_source.()
     {:ok, to_schedule} = get_next_scheduleable_times(reminders, now)
 
