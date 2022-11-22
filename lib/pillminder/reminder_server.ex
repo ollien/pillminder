@@ -192,6 +192,9 @@ defmodule Pillminder.ReminderServer do
         restart: :temporary
       )
 
+    # We put this under the task supervisor (which is a DynamicSupervisor under the covers) so that
+    # this isn't linked to the task in which we make the agent, but rather the GenServer as a whole
+    # TODO: Could we do this with some linking magic? is this just cleaner anyway?
     case DynamicSupervisor.start_child(supervisor, timer_agent_child_spec) do
       {:ok, timer_agent} ->
         Logger.debug("Made agent for timer with interval #{interval}")
