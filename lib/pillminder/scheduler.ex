@@ -41,9 +41,8 @@ defmodule Pillminder.Scheduler do
 
   @spec now!() :: DateTime.t()
   defp now!() do
-    with {:ok, now} <- Timex.local() |> ok_or() do
-      now
-    else
+    case Timex.local() |> ok_or() do
+      {:ok, now} -> now
       err -> raise "Could not get current time #{err}"
     end
   end
@@ -85,9 +84,11 @@ defmodule Pillminder.Scheduler do
   @spec get_ms_until(DateTime.t(), DateTime.t()) ::
           {:ok, non_neg_integer()} | {:error, String.t()}
   defp get_ms_until(now, time) do
-    with {:ok, ms_until} <- Timex.diff(time, now, :milliseconds) |> ok_or() do
-      {:ok, ms_until}
-    else
+    case Timex.diff(time, now, :milliseconds) |> ok_or() do
+      {:ok, ms_until} ->
+        {:ok, ms_until}
+        {:ok, ms_until}
+
       {:error, err} ->
         err_msg =
           "Failed to get ms from #{Time.to_iso8601(now)} to #{Time.to_iso8601(time)}: #{err}"

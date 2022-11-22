@@ -78,10 +78,18 @@ defmodule Pillminder.ReminderServer do
   @impl true
   @spec init(remind_func) :: {:ok, state}
   def init(remind_func) do
-    with {:ok, supervisor_pid} <- Task.Supervisor.start_link() do
-      {:ok, %{remind_func: remind_func, timer_agent: :no_timer, task_supervisor: supervisor_pid}}
-    else
-      {:error, err} -> {:stop, err}
+    case Task.Supervisor.start_link() do
+      {:ok, supervisor_pid} ->
+        initial_state = %{
+          remind_func: remind_func,
+          timer_agent: :no_timer,
+          task_supervisor: supervisor_pid
+        }
+
+        {:ok, initial_state}
+
+      {:error, err} ->
+        {:stop, err}
     end
   end
 
@@ -184,12 +192,16 @@ defmodule Pillminder.ReminderServer do
         restart: :temporary
       )
 
-    with {:ok, timer_agent} <- DynamicSupervisor.start_child(supervisor, timer_agent_child_spec) do
-      Logger.debug("Made agent for timer with interval #{interval}")
-      {:ok, timer_agent}
-    else
-      {:error, err} -> {:error, {:spawn_reminder_timer, err}}
-      err -> {:error, {:spawn_reminder_timer, err}}
+    case DynamicSupervisor.start_child(supervisor, timer_agent_child_spec) do
+      {:ok, timer_agent} ->
+        Logger.debug("Made agent for timer with interval #{interval}")
+        {:ok, timer_agent}
+
+      {:error, err} ->
+        {:error, {:spawn_reminder_timer, err}}
+
+      err ->
+        {:error, {:spawn_reminder_timer, err}}
     end
   end
 
