@@ -149,7 +149,7 @@ defmodule Pillminder.ReminderServer do
     end
 
     with {:ok, timer_agent_pid} <-
-           make_reminder_timer(state.task_supervisor, interval, send_reminder_fn),
+           make_timer_agent(state.task_supervisor, interval, send_reminder_fn),
          Process.link(timer_agent_pid),
          {:ok, updated_state} <- add_timer_to_state(state, timer_agent_pid),
          :ok <-
@@ -163,30 +163,35 @@ defmodule Pillminder.ReminderServer do
     end
   end
 
-  @spec make_reminder_timer(pid(), number(), (() -> any())) ::
+  @spec make_timer_agent(pid(), number(), (() -> any())) ::
           {:ok, pid()} | {:error, {:spawn_interval, any()}}
-  defp make_reminder_timer(supervisor, interval, send_reminder_fn) do
-    make_timer_fn = fn ->
-      case RunInterval.apply_interval(interval, send_reminder_fn) do
-        {:ok, timer_ref} -> timer_ref
-        {:error, err} -> {:error, {:reminder_build_failed, err}}
-      end
-    end
+  defp make_timer_agent(supervisor, interval, send_reminder_fn) do
+    timer_agent_child_spec =
+      Supervisor.child_spec(
+        {Agent, fn -> RunInterval.apply_interval(interval, send_reminder_fn) |> unwrap_ok end},
+        restart: :temporary
+      )
 
-    with {:ok, timer_agent} <- DynamicSupervisor.start_child(supervisor, {Agent, make_timer_fn}) do
-      # From the Agent docs, start_link will not return until the init function has returned, so we are guaranteed
-      # to have this value
-      case Agent.get(timer_agent, & &1) do
-        err = {:error, _reason} ->
-          # Kill the agent so that it isn't hanging around in the supervisor with an empty state
-          Agent.stop(timer_agent)
-          err
-
-        _timer_ref ->
-          {:ok, timer_agent}
-      end
+    with {:ok, timer_agent} <- DynamicSupervisor.start_child(supervisor, timer_agent_child_spec),
+         # From the Agent docs, start_link will not return until the init function has returned, so we are guaranteed
+         # to have the result of apply_interval, whether failed or not.
+         :ok <- ensure_agent_construction_succeeded(timer_agent) do
+      {:ok, timer_agent}
     else
-      err -> {:error, {:spawn_interval, err}}
+      err -> {:error, {:spawn_reminder_timer, err}}
+    end
+  end
+
+  @spec ensure_agent_construction_succeeded(pid()) :: :ok | {:error, any()}
+  defp ensure_agent_construction_succeeded(agent) do
+    case Agent.get(agent, & &1) do
+      err = {:error, _reason} ->
+        # Kill the agent so that it isn't hanging around in the supervisor with an empty state
+        Agent.stop(agent)
+        err
+
+      _value ->
+        :ok
     end
   end
 
@@ -267,4 +272,7 @@ defmodule Pillminder.ReminderServer do
 
     value
   end
+
+  defp unwrap_ok({:ok, value}), do: value
+  defp unwrap_ok(value), do: value
 end

@@ -91,9 +91,9 @@ defmodule PillminderTest.ReminderServer do
     start_supervised!({ReminderServer, {fn -> send(proc, :called) end}})
     :ok = ReminderServer.send_reminder_on_interval(interval)
 
-    assert_receive(:called, 100)
+    assert_receive(:called, interval * 2)
     :ok = ReminderServer.dismiss()
-    refute_receive(:called, interval)
+    refute_receive(:called, interval * 2)
   end
 
   test "cannot cancel when timer is not running" do
