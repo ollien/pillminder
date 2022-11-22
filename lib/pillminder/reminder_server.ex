@@ -188,6 +188,7 @@ defmodule Pillminder.ReminderServer do
       Logger.debug("Made agent for timer with interval #{interval}")
       {:ok, timer_agent}
     else
+      {:error, err} -> {:error, {:spawn_reminder_timer, err}}
       err -> {:error, {:spawn_reminder_timer, err}}
     end
   end
@@ -229,7 +230,7 @@ defmodule Pillminder.ReminderServer do
           "Failed to start send-immediate task, supervisor was asked to ignore the task"
         )
 
-        {:error, :task_ignored}
+        {:error, :ignore}
 
       {:error, reason} ->
         Logger.error("Failed to start send-immediate task: #{inspect(reason)}")
