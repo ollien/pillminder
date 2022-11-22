@@ -6,7 +6,7 @@ defmodule Pillminder.ReminderServer.TimerAgent do
 
   use Agent
 
-  alias Pillminder.RunInterval
+  alias Pillminder.Util.RunInterval
 
   @doc """
   Start a timer agent, which will call `RunInterval.apply_interval/2` with the given arguments. If {:ok, pid()} is

@@ -1,4 +1,4 @@
-defmodule Pillminder.RunInterval do
+defmodule Pillminder.Util.RunInterval do
   @doc """
   Run the given function on the given interval. This is a thin wrapper around :timer.apply_interval/4
   to allow greater flexibility with Elixir. Given timer_refs can be cancelled with RunInterval.cancel

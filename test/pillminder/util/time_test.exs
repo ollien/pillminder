@@ -2,7 +2,7 @@ defmodule PillminderTest.Util.Time do
   alias Pillminder.Util
 
   use ExUnit.Case, async: true
-  doctest Pillminder.RunInterval
+  doctest Pillminder.Util.Time
 
   describe "get_next_occurrence_of_time" do
     setup do

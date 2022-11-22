@@ -6,7 +6,7 @@ defmodule Pillminder.ReminderServer do
   """
 
   require Logger
-  alias Pillminder.RunInterval
+  alias Pillminder.Util.RunInterval
   alias Pillminder.ReminderServer.TimerAgent
 
   use GenServer
