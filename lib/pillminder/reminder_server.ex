@@ -7,6 +7,7 @@ defmodule Pillminder.ReminderServer do
 
   require Logger
   alias Pillminder.RunInterval
+  alias Pillminder.ReminderServer.TimerAgent
 
   use GenServer
 
@@ -179,14 +180,11 @@ defmodule Pillminder.ReminderServer do
   defp make_timer_agent(supervisor, interval, send_reminder_fn) do
     timer_agent_child_spec =
       Supervisor.child_spec(
-        {Agent, fn -> RunInterval.apply_interval(interval, send_reminder_fn) |> unwrap_ok end},
+        {TimerAgent, {interval, send_reminder_fn}},
         restart: :temporary
       )
 
-    with {:ok, timer_agent} <- DynamicSupervisor.start_child(supervisor, timer_agent_child_spec),
-         # From the Agent docs, start_link will not return until the init function has returned, so we are guaranteed
-         # to have the result of apply_interval, whether failed or not.
-         :ok <- ensure_agent_construction_succeeded(timer_agent) do
+    with {:ok, timer_agent} <- DynamicSupervisor.start_child(supervisor, timer_agent_child_spec) do
       Logger.debug("Made agent for timer with interval #{interval}")
       {:ok, timer_agent}
     else
@@ -194,16 +192,12 @@ defmodule Pillminder.ReminderServer do
     end
   end
 
-  @spec ensure_agent_construction_succeeded(pid()) :: :ok | {:error, any()}
-  defp ensure_agent_construction_succeeded(agent) do
-    case Agent.get(agent, & &1) do
-      err = {:error, _reason} ->
-        # Kill the agent so that it isn't hanging around in the supervisor with an empty state
-        Agent.stop(agent)
-        err
-
-      _value ->
-        :ok
+  @spec add_timer_to_state(state :: state, timer_agent :: pid()) ::
+          {:ok, state} | {:error, :already_timing | any()}
+  defp add_timer_to_state(state, timer_agent) do
+    case state.timer_agent do
+      :no_timer -> {:ok, Map.put(state, :timer_agent, timer_agent)}
+      _ -> {:error, :already_timing}
     end
   end
 
@@ -240,15 +234,6 @@ defmodule Pillminder.ReminderServer do
       {:error, reason} ->
         Logger.error("Failed to start send-immediate task: #{inspect(reason)}")
         {:error, reason}
-    end
-  end
-
-  @spec add_timer_to_state(state :: state, timer_agent :: pid()) ::
-          {:ok, state} | {:error, :already_timing | any()}
-  defp add_timer_to_state(state, timer_agent) do
-    case state.timer_agent do
-      :no_timer -> {:ok, Map.put(state, :timer_agent, timer_agent)}
-      _ -> {:error, :already_timing}
     end
   end
 
@@ -292,7 +277,4 @@ defmodule Pillminder.ReminderServer do
 
     value
   end
-
-  defp unwrap_ok({:ok, value}), do: value
-  defp unwrap_ok(value), do: value
 end
