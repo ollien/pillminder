@@ -8,7 +8,7 @@ defmodule Pillminder.ReminderServer do
   @type state :: %{
           remind_func: remind_func,
           task_supervisor: pid(),
-          timer: :timer.tref() | :no_timer
+          timer_agent: pid() | :no_timer
         }
 
   def start_link({remind_func}) do
@@ -71,7 +71,7 @@ defmodule Pillminder.ReminderServer do
   @spec init(remind_func) :: {:ok, state}
   def init(remind_func) do
     with {:ok, supervisor_pid} <- Task.Supervisor.start_link() do
-      {:ok, %{remind_func: remind_func, timer: :no_timer, task_supervisor: supervisor_pid}}
+      {:ok, %{remind_func: remind_func, timer_agent: :no_timer, task_supervisor: supervisor_pid}}
     else
       {:error, err} -> {:stop, err}
     end
@@ -104,27 +104,21 @@ defmodule Pillminder.ReminderServer do
           {:reply, :ok, state}
           | {:reply, {:error, :already_timing | any}, state}
   def handle_call({:setup_reminder, interval, destination, send_strategy}, _from, state) do
-    send_reminder_fn = fn ->
-      # We want to time out the call once our next interval hits
-      __MODULE__.send_reminder(timeout: interval, server_name: destination)
-    end
+    task =
+      Task.Supervisor.async_nolink(
+        state.task_supervisor,
+        fn -> setup_interval_reminder(interval, destination, send_strategy, state) end
+      )
 
-    make_interval_timer = fn -> RunInterval.apply_interval(interval, send_reminder_fn) end
+    case Task.yield(task, :infinity) do
+      {:ok, {:ok, output_state}} ->
+        {:reply, :ok, output_state}
 
-    case add_timer_to_state(state, make_interval_timer) do
-      {:ok, updated_state} when send_strategy == :send_immediately ->
-        # Now that we've scheduled the timer, immediately kick off the requested call (which won't be able)
-        # to complete at least until after we return
-        # TODO: I don't like that this is fire and forget
-        kick_off_immediate_send(state.task_supervisor, send_reminder_fn)
+      {:ok, {err = {:error, _reason}, output_state}} ->
+        {:reply, err, output_state}
 
-        {:reply, :ok, updated_state}
-
-      {:ok, updated_state} ->
-        {:reply, :ok, updated_state}
-
-      err = {:error, _reason} ->
-        {:reply, err, state}
+      {:exit, reason} ->
+        {:reply, {:error, reason}, state}
     end
   end
 
@@ -137,6 +131,75 @@ defmodule Pillminder.ReminderServer do
       {:ok, next_state} -> {:reply, :ok, next_state}
       {:error, err} -> {:reply, {:error, err}, state}
     end
+  end
+
+  @spec(
+    setup_interval_reminder(
+      number(),
+      GenServer.server(),
+      :send_immediately | :wait_until_interval,
+      state()
+    ) :: {:ok, state()},
+    {{:error, any()}, state()}
+  )
+  defp setup_interval_reminder(interval, destination, send_strategy, state) do
+    send_reminder_fn = fn ->
+      # We want to time out the call once our next interval hits
+      __MODULE__.send_reminder(timeout: interval, server_name: destination)
+    end
+
+    with {:ok, timer_agent_pid} <-
+           make_reminder_timer(state.task_supervisor, interval, send_reminder_fn),
+         Process.link(timer_agent_pid),
+         {:ok, updated_state} <- add_timer_to_state(state, timer_agent_pid),
+         :ok <-
+           perform_send_strategy_tasks(send_strategy, state.task_supervisor, send_reminder_fn) do
+      # Now that we've brought everything online, we can unlink so our task can safely terminate
+      Process.unlink(timer_agent_pid)
+      {:ok, updated_state}
+    else
+      err = {:error, _reason} ->
+        {err, state}
+    end
+  end
+
+  @spec make_reminder_timer(pid(), number(), (() -> any())) ::
+          {:ok, pid()} | {:error, {:spawn_interval, any()}}
+  defp make_reminder_timer(supervisor, interval, send_reminder_fn) do
+    make_timer_fn = fn ->
+      case RunInterval.apply_interval(interval, send_reminder_fn) do
+        {:ok, timer_ref} -> timer_ref
+        {:error, err} -> {:error, {:reminder_build_failed, err}}
+      end
+    end
+
+    with {:ok, timer_agent} <- DynamicSupervisor.start_child(supervisor, {Agent, make_timer_fn}) do
+      # From the Agent docs, start_link will not return until the init function has returned, so we are guaranteed
+      # to have this value
+      case Agent.get(timer_agent, & &1) do
+        err = {:error, _reason} ->
+          # Kill the agent so that it isn't hanging around in the supervisor with an empty state
+          Agent.stop(timer_agent)
+          err
+
+        _timer_ref ->
+          {:ok, timer_agent}
+      end
+    else
+      err -> {:error, {:spawn_interval, err}}
+    end
+  end
+
+  @spec perform_send_strategy_tasks(:send_immediately, pid(), (() -> any())) ::
+          :ok | {:error, any()}
+  defp perform_send_strategy_tasks(:send_immediately, supervisor, send_reminder_fn) do
+    kick_off_immediate_send(supervisor, send_reminder_fn)
+  end
+
+  @spec perform_send_strategy_tasks(:wait_until_interval, pid(), (() -> any())) ::
+          :ok | {:error, any()}
+  defp perform_send_strategy_tasks(:wait_until_interval, _supervisor, _send_reminder_fn) do
+    :ok
   end
 
   @spec kick_off_immediate_send(pid(), (() -> any())) :: :ok | {:error, any()}
@@ -155,7 +218,7 @@ defmodule Pillminder.ReminderServer do
           "Failed to start send-immediate task, supervisor was asked to ignore the task"
         )
 
-        {:error, :ignore}
+        {:error, :task_ignored}
 
       {:error, reason} ->
         Logger.error("Failed to start send-immediate task: #{inspect(reason)}")
@@ -163,31 +226,18 @@ defmodule Pillminder.ReminderServer do
     end
   end
 
-  @spec add_timer_to_state(
-          state :: state,
-          make_timer :: (() -> {:ok, :timer.tref()} | {:error, any()})
-        ) ::
+  @spec add_timer_to_state(state :: state, timer_agent :: pid()) ::
           {:ok, state} | {:error, :already_timing | any()}
-  defp add_timer_to_state(state, make_timer) do
-    with :ok <- ensure_no_timer_in_state(state),
-         {:ok, timer_ref} <- make_timer.() do
-      {:ok, Map.put(state, :timer, timer_ref)}
-    else
-      err = {:error, _reason} -> err
-    end
-  end
-
-  defp ensure_no_timer_in_state(state) do
-    case state.timer do
-      :no_timer -> :ok
+  defp add_timer_to_state(state, timer_agent) do
+    case state.timer_agent do
+      :no_timer -> {:ok, Map.put(state, :timer_agent, timer_agent)}
       _ -> {:error, :already_timing}
     end
   end
 
   @spec cancel_timer(state) :: {:ok, state} | {:error, :no_timer | any}
   defp cancel_timer(state) do
-    with {:ok, timer_ref} <- get_timer_from_state(state),
-         {:ok, _, next_state} <- remove_timer_from_state(state),
+    with {:ok, timer_ref, next_state} <- remove_timer_from_state(state),
          :ok <- RunInterval.cancel(timer_ref) do
       {:ok, next_state}
     else
@@ -195,24 +245,26 @@ defmodule Pillminder.ReminderServer do
     end
   end
 
-  defp get_timer_from_state(%{timer: :no_timer}) do
-    {:error, :no_timer}
-  end
-
-  defp get_timer_from_state(state) do
-    {:ok, state.timer}
-  end
-
   @spec remove_timer_from_state(state) ::
           {:ok, :timer.tref(), state} | {:error, :no_timer}
   defp remove_timer_from_state(state) do
-    case state.timer do
+    case state.timer_agent do
       :no_timer ->
         {:error, :no_timer}
 
       _ ->
-        {timer_ref, new_state} = Map.pop(state, :timer)
+        {timer_agent, no_timer_state} = Map.pop(state, :timer_agent)
+        new_state = Map.put(no_timer_state, :timer_agent, :no_timer)
+        timer_ref = extract_and_stop_agent(timer_agent)
+
         {:ok, timer_ref, new_state}
     end
+  end
+
+  defp extract_and_stop_agent(agent) do
+    value = Agent.get(agent, & &1)
+    Agent.stop(agent)
+
+    value
   end
 end
