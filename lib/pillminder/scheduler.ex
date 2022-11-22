@@ -18,6 +18,10 @@ defmodule Pillminder.Scheduler do
     Task.start(__MODULE__, :schedule_reminders, [reminders, supervisor, opts])
   end
 
+  @doc """
+    Schedule reminders to be run at the time indicated by their start time. These reminders will run to completion,
+    and then be rescheduled for the given time.
+  """
   @spec schedule_reminders([scheduled_reminder()], pid, init_options()) :: :ok
   def schedule_reminders(reminders, supervisor, opts \\ []) do
     clock_source = Keyword.get(opts, :clock_source, &now!/0)
@@ -113,28 +117,45 @@ defmodule Pillminder.Scheduler do
     :ok
   end
 
-  @spec run_and_reschedule(pid, scheduled_reminder(), clock_source()) :: :ok
+  @spec run_and_reschedule(pid, scheduled_reminder(), clock_source()) :: nil
   defp run_and_reschedule(supervisor, reminder, clock_source) do
-    supervised_task = Task.Supervisor.async_nolink(supervisor, reminder.scheduled_func)
+    run_reminder_task(supervisor, reminder)
+    run_reschedule_task(supervisor, reminder, clock_source)
+  end
+
+  defp run_reminder_task(supervisor, reminder) do
+    func_task = Task.Supervisor.async_nolink(supervisor, reminder.scheduled_func)
     # TODO: Should we pick a timeout here?
-    case Task.yield(supervised_task, :infinity) do
+    case Task.yield(func_task, :infinity) do
       {:ok, _} -> Logger.debug("Reminder task completed")
       {:exit, :normal} -> Logger.debug("Reminder task completed")
       {:exit, reason} -> Logger.error("Reminder task failed: #{inspect(reason)}")
     end
 
+    nil
+  end
+
+  defp run_reschedule_task(supervisor, reminder, clock_source) do
     # The only other possible return values for this are :ignore and :already_started, neither of which
     # can happen here.
-    {:ok, _} =
-      Task.Supervisor.start_child(
+    reschedule_task =
+      GenRetry.Task.Supervisor.async_nolink(
         supervisor,
-        fn ->
-          reschedule_reminder(supervisor, reminder, clock_source)
-        end,
-        restart: :transient
+        fn -> reschedule_reminder(supervisor, reminder, clock_source) end,
+        # We _REALLY_ want this to be scheduled; failure isn't quite an option.
+        retries: :infinity,
+        # ... but we probably don't want exponential backoff in that case.
+        exp_base: 1
       )
 
-    :ok
+    case Task.yield(reschedule_task, :infinity) do
+      {:ok, _} -> :ok
+      {:exit, :normal} -> :ok
+      # I don't believe this can really happen, given we have infinite retries.
+      {:exit, reason} -> Logger.error("Rescheduling reminder task failed: #{inspect(reason)}")
+    end
+
+    nil
   end
 
   @spec reschedule_reminder(pid, scheduled_reminder(), clock_source()) :: :ok
