@@ -1,4 +1,9 @@
 defmodule Pillminder.Scheduler do
+  @moduledoc """
+  The Scheduler is a Task that will kick off setting up daily reminders to take medication. Every day,
+  a single call is made to the given `scheduled_func` in a `scheduled_reminder`.
+  """
+
   require Logger
 
   alias Pillminder.Util

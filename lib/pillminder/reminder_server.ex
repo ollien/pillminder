@@ -1,10 +1,17 @@
 defmodule Pillminder.ReminderServer do
+  @moduledoc """
+  The ReminderServer handles sending mdeication reminders evenly spaced reminders, such as every few minutes.
+  This is intended to handle a single user's reminders; in a multi-user setup, there will be more than one
+  ReminderServer.
+  """
+
   require Logger
   alias Pillminder.RunInterval
 
   use GenServer
 
   @type remind_func :: (() -> any)
+  @type send_strategy :: :send_immediately | :wait_until_interval
   @type state :: %{
           remind_func: remind_func,
           task_supervisor: pid(),
@@ -96,8 +103,7 @@ defmodule Pillminder.ReminderServer do
   end
 
   @spec handle_call(
-          {:setup_reminder, non_neg_integer, GenServer.server(),
-           :send_immediately | :wait_until_interval},
+          {:setup_reminder, non_neg_integer, GenServer.server(), send_strategy()},
           {pid, term},
           state
         ) ::
@@ -125,6 +131,10 @@ defmodule Pillminder.ReminderServer do
   @spec handle_call(:dismiss, {pid, term}, state) ::
           {:reply, :ok | {:error, :no_timer | any}, state}
   def handle_call(:dismiss, _from, state) do
+    # I hate this log but I don't have other identifying info for this
+    # TODO: Get some kind of identification into state
+    Logger.debug("Dismissing timer")
+
     cancel_res = cancel_timer(state)
 
     case cancel_res do
@@ -137,7 +147,7 @@ defmodule Pillminder.ReminderServer do
     setup_interval_reminder(
       number(),
       GenServer.server(),
-      :send_immediately | :wait_until_interval,
+      send_strategy(),
       state()
     ) :: {:ok, state()},
     {{:error, any()}, state()}
@@ -156,6 +166,7 @@ defmodule Pillminder.ReminderServer do
            perform_send_strategy_tasks(send_strategy, state.task_supervisor, send_reminder_fn) do
       # Now that we've brought everything online, we can unlink so our task can safely terminate
       Process.unlink(timer_agent_pid)
+      Logger.debug("Reminder timer for interval #{interval} has been stored and begun")
       {:ok, updated_state}
     else
       err = {:error, _reason} ->
@@ -163,7 +174,7 @@ defmodule Pillminder.ReminderServer do
     end
   end
 
-  @spec make_timer_agent(pid(), number(), (() -> any())) ::
+  @spec make_timer_agent(pid(), number(), remind_func()) ::
           {:ok, pid()} | {:error, {:spawn_interval, any()}}
   defp make_timer_agent(supervisor, interval, send_reminder_fn) do
     timer_agent_child_spec =
@@ -176,6 +187,7 @@ defmodule Pillminder.ReminderServer do
          # From the Agent docs, start_link will not return until the init function has returned, so we are guaranteed
          # to have the result of apply_interval, whether failed or not.
          :ok <- ensure_agent_construction_succeeded(timer_agent) do
+      Logger.debug("Made agent for timer with interval #{interval}")
       {:ok, timer_agent}
     else
       err -> {:error, {:spawn_reminder_timer, err}}
@@ -195,19 +207,19 @@ defmodule Pillminder.ReminderServer do
     end
   end
 
-  @spec perform_send_strategy_tasks(:send_immediately, pid(), (() -> any())) ::
+  @spec perform_send_strategy_tasks(:send_immediately, pid(), remind_func()) ::
           :ok | {:error, any()}
   defp perform_send_strategy_tasks(:send_immediately, supervisor, send_reminder_fn) do
     kick_off_immediate_send(supervisor, send_reminder_fn)
   end
 
-  @spec perform_send_strategy_tasks(:wait_until_interval, pid(), (() -> any())) ::
+  @spec perform_send_strategy_tasks(:wait_until_interval, pid(), remind_func()) ::
           :ok | {:error, any()}
   defp perform_send_strategy_tasks(:wait_until_interval, _supervisor, _send_reminder_fn) do
     :ok
   end
 
-  @spec kick_off_immediate_send(pid(), (() -> any())) :: :ok | {:error, any()}
+  @spec kick_off_immediate_send(pid(), remind_func()) :: :ok | {:error, any()}
   defp kick_off_immediate_send(supervisor, send_reminder_fn) do
     case Task.Supervisor.start_child(supervisor, send_reminder_fn) do
       {:ok, _} ->
@@ -243,10 +255,18 @@ defmodule Pillminder.ReminderServer do
   @spec cancel_timer(state) :: {:ok, state} | {:error, :no_timer | any}
   defp cancel_timer(state) do
     with {:ok, timer_ref, next_state} <- remove_timer_from_state(state),
-         :ok <- RunInterval.cancel(timer_ref) do
+         :ok <- cancel_timer_ref(timer_ref) do
       {:ok, next_state}
     else
-      err -> err
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @spec cancel_timer(:timer.tref()) :: :ok | {:error, {:cancel_failed, any()}}
+  defp cancel_timer_ref(timer_ref) do
+    case RunInterval.cancel(timer_ref) do
+      :ok -> :ok
+      {:error, reason} -> {:error, {:cancel_failed, reason}}
     end
   end
 
