@@ -92,11 +92,11 @@ defmodule Pillminder.ReminderServer do
       __MODULE__.send_reminder(timeout: interval, server_name: destination)
     end
 
-    with {:ok, timer_ref} <- RunInterval.apply_interval(interval, send_reminder_fn),
-         {:ok, updated_state} <- add_timer_to_state(state, timer_ref) do
-      {:reply, :ok, updated_state}
-    else
-      err -> {:reply, err, state}
+    make_interval_timer = fn -> RunInterval.apply_interval(interval, send_reminder_fn) end
+
+    case add_timer_to_state(state, make_interval_timer) do
+      {:ok, updated_state} -> {:reply, :ok, updated_state}
+      err = {:error, _reason} -> {:reply, err, state}
     end
   end
 
@@ -111,10 +111,23 @@ defmodule Pillminder.ReminderServer do
     end
   end
 
-  @spec add_timer_to_state(state, :timer.tref()) :: {:ok, state} | {:error, :already_timing}
-  defp add_timer_to_state(state, timer) do
+  @spec add_timer_to_state(
+          state :: state,
+          make_timer :: (() -> {:ok, :timer.tref()} | {:error, any()})
+        ) ::
+          {:ok, state} | {:error, :already_timing | any()}
+  defp add_timer_to_state(state, make_timer) do
+    with :ok <- ensure_no_timer_in_state(state),
+         {:ok, timer_ref} <- make_timer.() do
+      {:ok, Map.put(state, :timer, timer_ref)}
+    else
+      err = {:error, _reason} -> err
+    end
+  end
+
+  defp ensure_no_timer_in_state(state) do
     case state.timer do
-      :no_timer -> {:ok, Map.put(state, :timer, timer)}
+      :no_timer -> :ok
       _ -> {:error, :already_timing}
     end
   end
