@@ -7,7 +7,27 @@ defmodule PillminderTest.ReminderServer do
   test "calls target function when send_reminder is called" do
     {:ok, called_agent} = Agent.start_link(fn -> false end)
     start_supervised!({ReminderServer, {fn -> Agent.update(called_agent, fn _ -> true end) end}})
-    :ok = ReminderServer.send_reminder()
+    {:ok, :ok} = ReminderServer.send_reminder()
+    was_called = Agent.get(called_agent, & &1)
+    assert was_called
+  end
+
+  test "retries sending when the task crashes" do
+    {:ok, should_crash_agent} = Agent.start_link(fn -> true end)
+    {:ok, called_agent} = Agent.start_link(fn -> false end)
+
+    start_supervised!({ReminderServer,
+     {fn ->
+        # On the first call, this will fail and we will crash deliberately
+        if Agent.get_and_update(should_crash_agent, fn value -> {value, false} end) do
+          :erlang.error(:deliberate_crash)
+        end
+
+        # On the second call, the :erlang.error should not occur and we will mark called as true
+        Agent.update(called_agent, fn _ -> true end)
+      end}})
+
+    {:ok, :ok} = ReminderServer.send_reminder()
     was_called = Agent.get(called_agent, & &1)
     assert was_called
   end

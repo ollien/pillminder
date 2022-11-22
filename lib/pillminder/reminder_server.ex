@@ -6,6 +6,7 @@ defmodule Pillminder.ReminderServer do
   @type remind_func :: (() -> any)
   @type state :: %{
           remind_func: remind_func,
+          task_supervisor: Task.Supervisor.t(),
           timer: :timer.tref() | :no_timer
         }
 
@@ -42,10 +43,12 @@ defmodule Pillminder.ReminderServer do
   end
 
   @doc """
-    Cal the reminder func, with a given timeout in milliseconds
+    Call the reminder func, with a given timeout in milliseconds. NOTE: the "ok" variant here is used to indicate
+    that the function was successfully called. If your function returns an :error tuple, for instance, you may
+    receive {:ok, {:error, some_error}}
   """
   @spec send_reminder(timeout: non_neg_integer | :infinity, server_name: GenServer.server()) ::
-          any
+          {:ok, any} | {:error, any}
   def send_reminder(opts \\ []) do
     destination = Keyword.get(opts, :server_name, __MODULE__)
     timeout = Keyword.get(opts, :timeout, 5000)
@@ -55,14 +58,29 @@ defmodule Pillminder.ReminderServer do
   @impl true
   @spec init(remind_func) :: {:ok, state}
   def init(remind_func) do
-    {:ok, %{remind_func: remind_func, timer: :no_timer}}
+    with {:ok, supervisor_pid} <- Task.Supervisor.start_link() do
+      {:ok, %{remind_func: remind_func, timer: :no_timer, task_supervisor: supervisor_pid}}
+    else
+      {:error, err} -> {:stop, err}
+    end
   end
 
   @impl true
-  @spec handle_call(:remind, {pid, term}, state) :: {:reply, any, state}
+  @spec handle_call(:remind, {pid, term}, state) :: {:reply, {:ok, any} | {:error, any}, state}
   def handle_call(:remind, _from, state) do
-    ret = state.remind_func.()
-    {:reply, ret, state}
+    task =
+      GenRetry.Task.Supervisor.async_nolink(state.task_supervisor, state.remind_func, delay: 250)
+
+    case Task.yield(task, :infinity) do
+      {:exit, :normal} ->
+        {:reply, {:ok, nil}, state}
+
+      {:ok, ret} ->
+        {:reply, {:ok, ret}, state}
+
+      {:exit, reason} ->
+        {:reply, {:error, {:exit, reason}}, state}
+    end
   end
 
   @spec handle_call({:setup_reminder, non_neg_integer, GenServer.server()}, {pid, term}, state) ::
