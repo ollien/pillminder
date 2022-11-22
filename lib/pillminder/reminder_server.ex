@@ -6,7 +6,7 @@ defmodule Pillminder.ReminderServer do
   @type remind_func :: (() -> any)
   @type state :: %{
           remind_func: remind_func,
-          task_supervisor: Task.Supervisor.t(),
+          task_supervisor: pid(),
           timer: :timer.tref() | :no_timer
         }
 
