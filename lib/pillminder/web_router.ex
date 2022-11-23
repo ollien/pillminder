@@ -1,6 +1,6 @@
 defmodule Pillminder.WebRouter do
   require Logger
-  alias Pillminder.ReminderServer
+  alias Pillminder.ReminderSender
 
   use Plug.Router
 
@@ -9,13 +9,13 @@ defmodule Pillminder.WebRouter do
 
   delete "/timer/:timer_id" do
     with {:ok, pid} <- get_pid_for_timer_id(timer_id),
-         :ok <- ReminderServer.dismiss(server_name: pid) do
+         :ok <- ReminderSender.dismiss(server_name: pid) do
       Logger.info("Cleared timer id #{timer_id}")
       send_resp(conn, 200, "")
     else
       {:error, :no_servers} ->
         Logger.info(
-          "Attempted to dismiss timer id #{timer_id} but no corresponding reminder server was found"
+          "Attempted to dismiss timer id #{timer_id} but no corresponding reminder sender was found"
         )
 
         send_resp(conn, 404, "")
@@ -46,8 +46,8 @@ defmodule Pillminder.WebRouter do
   defp get_pid_for_timer_id(timer_id) do
     entries =
       Registry.lookup(
-        Pillminder.Application.reminder_server_registry(),
-        Pillminder.Application.make_reminder_server_id(timer_id)
+        Pillminder.Application.reminder_sender_registry(),
+        Pillminder.Application.make_reminder_sender_id(timer_id)
       )
 
     case entries do

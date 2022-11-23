@@ -1,13 +1,13 @@
-defmodule Pillminder.ReminderServer do
+defmodule Pillminder.ReminderSender do
   @moduledoc """
-  The ReminderServer handles sending mdeication reminders evenly spaced reminders, such as every few minutes.
+  The ReminderSender handles sending mdeication reminders evenly spaced reminders, such as every few minutes.
   This is intended to handle a single user's reminders; in a multi-user setup, there will be more than one
-  ReminderServer.
+  ReminderSender.
   """
 
   require Logger
   alias Pillminder.Util.RunInterval
-  alias Pillminder.ReminderServer.TimerAgent
+  alias Pillminder.ReminderSender.TimerAgent
 
   use GenServer
 
