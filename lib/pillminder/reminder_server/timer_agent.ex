@@ -23,6 +23,25 @@ defmodule Pillminder.ReminderServer.TimerAgent do
     end
   end
 
+  @doc """
+  Get the value currently stored in the Timer agent. See `Agent.get/2` for more details on semantics, but
+  this will always get the value as-is without any transformation.
+  """
+  # This should theoretically always be a tref but I don't think we have a true way to guarantee or assert that, so I
+  # put any in the type signature
+  @spec get_value(Agent.agent(), number) :: any
+  def get_value(agent, timeout \\ 5000) do
+    Agent.get(agent, & &1, timeout)
+  end
+
+  @doc """
+  Stop the timer agent. See `Agent.stop/3` for more details.
+  """
+  @spec stop(Agent.agent(), atom, number) :: any
+  def stop(agent, reason \\ :normal, timeout \\ 5000) do
+    Agent.stop(agent, reason, timeout)
+  end
+
   @spec make_initial_timer_state(number(), (() -> any())) :: :timer.tref() | {:error, any()}
   defp make_initial_timer_state(interval, send_reminder_fn) do
     RunInterval.apply_interval(interval, send_reminder_fn) |> unwrap_ok

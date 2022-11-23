@@ -288,8 +288,8 @@ defmodule Pillminder.ReminderServer do
   end
 
   defp extract_and_stop_agent(agent) do
-    value = Agent.get(agent, & &1)
-    Agent.stop(agent)
+    value = TimerAgent.get_value(agent)
+    TimerAgent.stop(agent)
 
     value
   end
