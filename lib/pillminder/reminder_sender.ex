@@ -8,6 +8,7 @@ defmodule Pillminder.ReminderSender do
   require Logger
   alias Pillminder.Util.RunInterval
   alias Pillminder.ReminderSender.TimerAgent
+  alias Pillminder.ReminderSender.TimerSupervisor
 
   use GenServer
 
@@ -168,7 +169,7 @@ defmodule Pillminder.ReminderSender do
     end
 
     with {:ok, timer_agent_pid} <-
-           make_timer_agent(state.task_supervisor, interval, send_reminder_fn),
+           make_timer_agent(interval, send_reminder_fn),
          Process.link(timer_agent_pid),
          {:ok, updated_state} <- add_timer_to_state(state, timer_agent_pid),
          :ok <-
@@ -183,19 +184,10 @@ defmodule Pillminder.ReminderSender do
     end
   end
 
-  @spec make_timer_agent(pid(), number(), remind_func()) ::
+  @spec make_timer_agent(number(), remind_func()) ::
           {:ok, pid()} | {:error, {:spawn_interval, any()}}
-  defp make_timer_agent(supervisor, interval, send_reminder_fn) do
-    timer_agent_child_spec =
-      Supervisor.child_spec(
-        {TimerAgent, {interval, send_reminder_fn}},
-        restart: :temporary
-      )
-
-    # We put this under the task supervisor (which is a DynamicSupervisor under the covers) so that
-    # this isn't linked to the task in which we make the agent, but rather the GenServer as a whole
-    # TODO: Could we do this with some linking magic? is this just cleaner anyway?
-    case DynamicSupervisor.start_child(supervisor, timer_agent_child_spec) do
+  defp make_timer_agent(interval, send_reminder_fn) do
+    case TimerSupervisor.start_timer_agent(interval, send_reminder_fn) do
       {:ok, timer_agent} ->
         Logger.debug("Made agent for timer with interval #{interval}")
         {:ok, timer_agent}

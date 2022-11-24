@@ -15,7 +15,10 @@ defmodule Pillminder.Application do
     timer_specs = Enum.map(timers, &make_reminder_sender_spec/1)
 
     children =
-      [{Registry, keys: :unique, name: @registry_name}] ++
+      [
+        {Registry, keys: :unique, name: @registry_name},
+        {Pillminder.ReminderSender.TimerSupervisor, nil}
+      ] ++
         timer_specs ++
         [
           {Scheduler, make_scheduler_args(timers)},

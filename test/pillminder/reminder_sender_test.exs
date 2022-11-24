@@ -4,6 +4,11 @@ defmodule PillminderTest.ReminderSender do
   use ExUnit.Case, async: true
   doctest Pillminder.ReminderSender
 
+  setup do
+    start_supervised!({ReminderSender.TimerSupervisor, nil})
+    :ok
+  end
+
   test "calls target function when send_reminder is called" do
     {:ok, called_agent} = Agent.start_link(fn -> false end)
     start_supervised!({ReminderSender, {fn -> Agent.update(called_agent, fn _ -> true end) end}})
@@ -94,6 +99,21 @@ defmodule PillminderTest.ReminderSender do
     assert_receive(:called, interval * 2)
     :ok = ReminderSender.dismiss()
     refute_receive(:called, interval * 2)
+  end
+
+  test "continues to send interval reminder even if ReminderServer crashes" do
+    proc = self()
+
+    pid = start_supervised!({ReminderSender, {fn -> send(proc, :called) end}})
+    :ok = ReminderSender.send_reminder_on_interval(50, send_immediately: true)
+
+    # Kill the process to simulate a crash
+    Process.exit(pid, :kill)
+
+    # Imperfect, but by calling multiple times we can assume we are being called on an interval
+    assert_receive(:called, 100)
+    assert_receive(:called, 100)
+    assert_receive(:called, 100)
   end
 
   test "cannot cancel when timer is not running" do
