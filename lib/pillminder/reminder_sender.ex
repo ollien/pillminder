@@ -14,11 +14,17 @@ defmodule Pillminder.ReminderSender do
 
   @type remind_func :: (() -> any)
   @type send_strategy :: :send_immediately | :wait_until_interval
-  @type state :: %{
-          remind_func: remind_func,
-          task_supervisor: pid(),
-          timer_agent: pid() | :no_timer
-        }
+
+  defmodule State do
+    @enforce_keys [:remind_func, :task_supervisor]
+    defstruct [:remind_func, :task_supervisor, timer_agent: :no_timer]
+
+    @type t :: %__MODULE__{
+            remind_func: Pillminder.ReminderSender.remind_func(),
+            task_supervisor: pid(),
+            timer_agent: pid() | :no_timer
+          }
+  end
 
   def start_link({remind_func}) do
     start_link({remind_func, []})
@@ -77,13 +83,12 @@ defmodule Pillminder.ReminderSender do
   end
 
   @impl true
-  @spec init(remind_func) :: {:ok, state}
+  @spec init(remind_func) :: {:ok, State.t()}
   def init(remind_func) do
     case Task.Supervisor.start_link() do
       {:ok, supervisor_pid} ->
-        initial_state = %{
+        initial_state = %State{
           remind_func: remind_func,
-          timer_agent: :no_timer,
           task_supervisor: supervisor_pid
         }
 
@@ -95,7 +100,8 @@ defmodule Pillminder.ReminderSender do
   end
 
   @impl true
-  @spec handle_call(:remind, {pid, term}, state) :: {:reply, {:ok, any} | {:error, any}, state}
+  @spec handle_call(:remind, {pid, term}, State.t()) ::
+          {:reply, {:ok, any} | {:error, any}, State.t()}
   def handle_call(:remind, _from, state) do
     task =
       GenRetry.Task.Supervisor.async_nolink(state.task_supervisor, state.remind_func, delay: 250)
@@ -115,10 +121,10 @@ defmodule Pillminder.ReminderSender do
   @spec handle_call(
           {:setup_reminder, non_neg_integer, GenServer.server(), send_strategy()},
           {pid, term},
-          state
+          State.t()
         ) ::
-          {:reply, :ok, state}
-          | {:reply, {:error, :already_timing | any}, state}
+          {:reply, :ok, State.t()}
+          | {:reply, {:error, :already_timing | any}, State.t()}
   def handle_call({:setup_reminder, interval, destination, send_strategy}, _from, state) do
     task =
       Task.Supervisor.async_nolink(
@@ -138,8 +144,8 @@ defmodule Pillminder.ReminderSender do
     end
   end
 
-  @spec handle_call(:dismiss, {pid, term}, state) ::
-          {:reply, :ok | {:error, :no_timer | any}, state}
+  @spec handle_call(:dismiss, {pid, term}, State.t()) ::
+          {:reply, :ok | {:error, :no_timer | any}, State.t()}
   def handle_call(:dismiss, _from, state) do
     # I hate this log but I don't have other identifying info for this
     # TODO: Get some kind of identification into state
@@ -158,9 +164,9 @@ defmodule Pillminder.ReminderSender do
       number(),
       GenServer.server(),
       send_strategy(),
-      state()
-    ) :: {:ok, state()},
-    {{:error, any()}, state()}
+      State.t()
+    ) :: {:ok, State.t()},
+    {{:error, any()}, State.t()}
   )
   defp setup_interval_reminder(interval, destination, send_strategy, state) do
     send_reminder_fn = fn ->
@@ -197,8 +203,8 @@ defmodule Pillminder.ReminderSender do
     end
   end
 
-  @spec add_timer_to_state(state :: state, timer_agent :: pid()) ::
-          {:ok, state} | {:error, :already_timing | any()}
+  @spec add_timer_to_state(state :: State.t(), timer_agent :: pid()) ::
+          {:ok, State.t()} | {:error, :already_timing | any()}
   defp add_timer_to_state(state, timer_agent) do
     case state.timer_agent do
       :no_timer -> {:ok, Map.put(state, :timer_agent, timer_agent)}
@@ -242,7 +248,7 @@ defmodule Pillminder.ReminderSender do
     end
   end
 
-  @spec cancel_timer(state) :: {:ok, state} | {:error, :no_timer | any}
+  @spec cancel_timer(State.t()) :: {:ok, State.t()} | {:error, :no_timer | any}
   defp cancel_timer(state) do
     with {:ok, timer_ref, next_state} <- remove_timer_from_state(state),
          :ok <- cancel_timer_ref(timer_ref) do
@@ -260,8 +266,8 @@ defmodule Pillminder.ReminderSender do
     end
   end
 
-  @spec remove_timer_from_state(state) ::
-          {:ok, :timer.tref(), state} | {:error, :no_timer}
+  @spec remove_timer_from_state(State.t()) ::
+          {:ok, :timer.tref(), State.t()} | {:error, :no_timer}
   defp remove_timer_from_state(state) do
     case state.timer_agent do
       :no_timer ->

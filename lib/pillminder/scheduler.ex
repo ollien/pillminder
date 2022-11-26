@@ -1,23 +1,19 @@
 defmodule Pillminder.Scheduler do
   @moduledoc """
   The Scheduler is a Task that will kick off setting up daily reminders to take medication. Every day,
-  a single call is made to the given `scheduled_func` in a `scheduled_reminder`.
+  a single call is made to the given `scheduled_func` in a `ScheduledReminder`
   """
 
   require Logger
 
+  alias Pillminder.Scheduler.ScheduledReminder
   alias Pillminder.Util
   use Task
 
   @type clock_source :: (() -> DateTime.t())
   @type init_options :: [clock_source: clock_source()]
-  @type state :: %{clock_source: clock_source()}
-  @type scheduled_reminder :: %{
-          start_time: Time.t(),
-          scheduled_func: (() -> any())
-        }
 
-  @spec start_link({[scheduled_reminder()], init_options()}) :: {:ok, pid}
+  @spec start_link({[ScheduledReminder.t()], init_options()}) :: {:ok, pid}
   def start_link({reminders, opts}) do
     {:ok, supervisor} = Task.Supervisor.start_link()
     Task.start(__MODULE__, :schedule_reminders, [reminders, supervisor, opts])
@@ -27,7 +23,7 @@ defmodule Pillminder.Scheduler do
     Schedule reminders to be run at the time indicated by their start time. These reminders will run to completion,
     and then be rescheduled for the given time.
   """
-  @spec schedule_reminders([scheduled_reminder()], pid, init_options()) :: :ok
+  @spec schedule_reminders([ScheduledReminder.t()], pid, init_options()) :: :ok
   def schedule_reminders(reminders, supervisor, opts \\ []) do
     clock_source = Keyword.get(opts, :clock_source, &now!/0)
     now = clock_source.()
@@ -56,8 +52,8 @@ defmodule Pillminder.Scheduler do
     {:ok, value}
   end
 
-  @spec get_next_scheduleable_times(reminders :: [scheduled_reminder()], now :: DateTime.t()) ::
-          {:ok, [{scheduled_reminder(), DateTime.t()}]} | {:error, String.t()}
+  @spec get_next_scheduleable_times(reminders :: [ScheduledReminder.t()], now :: DateTime.t()) ::
+          {:ok, [{ScheduledReminder.t(), DateTime.t()}]} | {:error, String.t()}
   defp get_next_scheduleable_times(reminders, now) do
     Enum.reverse(reminders)
     |> Enum.reduce_while([], fn reminder, acc ->
@@ -75,7 +71,7 @@ defmodule Pillminder.Scheduler do
     |> ok_or()
   end
 
-  @spec get_next_scheduleable_time(reminder :: scheduled_reminder(), now :: DateTime.t()) ::
+  @spec get_next_scheduleable_time(reminder :: ScheduledReminder.t(), now :: DateTime.t()) ::
           {:ok, DateTime.t()} | {:error, String.t()}
   defp get_next_scheduleable_time(reminder, now) do
     Util.Time.get_next_occurrence_of_time(now, reminder.start_time) |> ok_or()
@@ -99,7 +95,7 @@ defmodule Pillminder.Scheduler do
 
   @spec schedule_reminder(
           pid,
-          scheduled_reminder(),
+          ScheduledReminder.t(),
           non_neg_integer(),
           clock_source()
         ) :: :ok
@@ -126,7 +122,7 @@ defmodule Pillminder.Scheduler do
     :ok
   end
 
-  @spec run_and_reschedule(pid, scheduled_reminder(), clock_source()) :: nil
+  @spec run_and_reschedule(pid, ScheduledReminder.t(), clock_source()) :: nil
   defp run_and_reschedule(supervisor, reminder, clock_source) do
     run_reminder_task(supervisor, reminder)
     run_reschedule_task(supervisor, reminder, clock_source)
@@ -167,7 +163,7 @@ defmodule Pillminder.Scheduler do
     nil
   end
 
-  @spec reschedule_reminder(pid, scheduled_reminder(), clock_source()) :: :ok
+  @spec reschedule_reminder(pid, ScheduledReminder.t(), clock_source()) :: :ok
   defp reschedule_reminder(supervisor, reminder, clock_source) do
     now = clock_source.()
     {:ok, schedule_time} = get_next_scheduleable_time(reminder, now)

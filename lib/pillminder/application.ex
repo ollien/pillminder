@@ -59,7 +59,7 @@ defmodule Pillminder.Application do
   end
 
   @spec make_scheduler_args([Config.Timer.t()]) ::
-          {[Scheduler.scheduled_reminder()], Scheduler.init_options()}
+          {[Scheduler.ScheduledReminder.t()], Scheduler.init_options()}
   defp make_scheduler_args(timers) do
     {
       Enum.map(timers, &make_reminder_for_scheduler/1),
@@ -67,9 +67,9 @@ defmodule Pillminder.Application do
     }
   end
 
-  @spec make_reminder_for_scheduler(Config.Timer.t()) :: Scheduler.scheduled_reminder()
+  @spec make_reminder_for_scheduler(Config.Timer.t()) :: Scheduler.ScheduledReminder.t()
   defp make_reminder_for_scheduler(timer) do
-    %{
+    %Scheduler.ScheduledReminder{
       start_time: timer.reminder_start_time,
       scheduled_func: fn ->
         # The task supervisor in the Scheduler should re-run this, so it's ok to assert
