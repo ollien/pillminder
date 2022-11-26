@@ -185,7 +185,7 @@ defmodule Pillminder.ReminderSender do
   end
 
   @spec make_timer_agent(number(), remind_func()) ::
-          {:ok, pid()} | {:error, {:spawn_interval, any()}}
+          {:ok, pid()} | {:error, {:spawn_reminder_timer, any()}}
   defp make_timer_agent(interval, send_reminder_fn) do
     case TimerSupervisor.start_timer_agent(interval, send_reminder_fn) do
       {:ok, timer_agent} ->
@@ -193,9 +193,6 @@ defmodule Pillminder.ReminderSender do
         {:ok, timer_agent}
 
       {:error, err} ->
-        {:error, {:spawn_reminder_timer, err}}
-
-      err ->
         {:error, {:spawn_reminder_timer, err}}
     end
   end
