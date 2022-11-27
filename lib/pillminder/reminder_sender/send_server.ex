@@ -34,7 +34,13 @@ defmodule Pillminder.ReminderSender.SendServer do
           {:ok, pid} | {:error, any} | :ignore
   def start_link({remind_func, opts}) do
     full_opts = Keyword.put_new(opts, :name, __MODULE__)
-    GenServer.start_link(__MODULE__, remind_func, full_opts)
+
+    # A sender id is used to give a readable name in logs; if not included, we'll just use the registered name.
+    # Via tuples are kind of hard to read so I don't really want to use them
+    sender_id =
+      Keyword.get(opts, :sender_id, Keyword.get(opts, :name, __MODULE__)) |> stringify_id()
+
+    GenServer.start_link(__MODULE__, {remind_func, sender_id}, full_opts)
   end
 
   @doc """
@@ -83,8 +89,10 @@ defmodule Pillminder.ReminderSender.SendServer do
   end
 
   @impl true
-  @spec init(remind_func) :: {:ok, State.t()}
-  def init(remind_func) do
+  @spec init({remind_func, String.t()}) :: {:ok, State.t()}
+  def init({remind_func, sender_id}) do
+    Logger.metadata(sender_id: sender_id)
+
     case Task.Supervisor.start_link() do
       {:ok, supervisor_pid} ->
         initial_state = %State{
@@ -103,8 +111,19 @@ defmodule Pillminder.ReminderSender.SendServer do
   @spec handle_call(:remind, {pid, term}, State.t()) ::
           {:reply, {:ok, any} | {:error, any}, State.t()}
   def handle_call(:remind, _from, state) do
+    logger_metadata = Logger.metadata()
+
     task =
-      GenRetry.Task.Supervisor.async_nolink(state.task_supervisor, state.remind_func, delay: 250)
+      GenRetry.Task.Supervisor.async_nolink(
+        state.task_supervisor,
+        fn ->
+          # Inherit the metadata from the parent process
+          Logger.metadata(logger_metadata)
+
+          state.remind_func.()
+        end,
+        delay: 250
+      )
 
     case Task.yield(task, :infinity) do
       {:exit, :normal} ->
@@ -126,10 +145,17 @@ defmodule Pillminder.ReminderSender.SendServer do
           {:reply, :ok, State.t()}
           | {:reply, {:error, :already_timing | any}, State.t()}
   def handle_call({:setup_reminder, interval, destination, send_strategy}, _from, state) do
+    logger_metadata = Logger.metadata()
+
     task =
       Task.Supervisor.async_nolink(
         state.task_supervisor,
-        fn -> setup_interval_reminder(interval, destination, send_strategy, state) end
+        fn ->
+          # Inherit the metadata from the parent process
+          Logger.metadata(logger_metadata)
+
+          setup_interval_reminder(interval, destination, send_strategy, state)
+        end
       )
 
     case Task.yield(task, :infinity) do
@@ -147,8 +173,6 @@ defmodule Pillminder.ReminderSender.SendServer do
   @spec handle_call(:dismiss, {pid, term}, State.t()) ::
           {:reply, :ok | {:error, :no_timer | any}, State.t()}
   def handle_call(:dismiss, _from, state) do
-    # I hate this log but I don't have other identifying info for this
-    # TODO: Get some kind of identification into state
     Logger.debug("Dismissing timer")
 
     cancel_res = cancel_timer(state)
@@ -287,5 +311,17 @@ defmodule Pillminder.ReminderSender.SendServer do
     TimerAgent.stop(agent)
 
     value
+  end
+
+  defp stringify_id(name) when is_atom(name) do
+    Atom.to_string(name)
+  end
+
+  defp stringify_id(name) when is_binary(name) do
+    name
+  end
+
+  defp stringify_id(name) do
+    inspect(name)
   end
 end

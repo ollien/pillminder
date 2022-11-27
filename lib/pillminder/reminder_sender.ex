@@ -86,7 +86,9 @@ defmodule Pillminder.ReminderSender do
   @spec make_send_server_spec({sender_id, SendServer.remind_func()}) :: Supervisor.child_spec()
   defp make_send_server_spec({timer_id, remind_func}) do
     Supervisor.child_spec(
-      {SendServer, {remind_func, name: make_send_server_via_tuple(timer_id)}},
+      {SendServer,
+       {remind_func,
+        name: make_send_server_via_tuple(timer_id), sender_id: make_send_server_id(timer_id)}},
       id: make_send_server_id(timer_id)
     )
   end
