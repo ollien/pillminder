@@ -61,7 +61,7 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
   def handle_call(
         {:snooze, snooze_ms, unsnooze_destination},
         _from,
-        state = %State{timer: {:interval_timer, timer_ref}}
+        state = %State{timer: {_timer_type, timer_ref}}
       ) do
     with :ok <- cancel_before_snooze(timer_ref),
          {:ok, timer_ref} <- schedule_unsnooze(unsnooze_destination, snooze_ms) do
@@ -69,7 +69,7 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
       {:reply, :ok, updated_state}
     else
       # We really can't recover from something like this. We could attempt to reschedule the original interval
-      # timer but that would be difficult to deal with (what if that reschedule failed?)
+      # timer (if we had one!) but that would be difficult to deal with (what if that reschedule failed?)
       {:error, reason} -> raise({:snooze_failed, reason})
     end
   end

@@ -106,6 +106,21 @@ defmodule PillminderTest.ReminderSender do
     assert_receive(:called, 100)
   end
 
+  test "snoozing twice will take the latter of the two lengths" do
+    proc = self()
+    start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
+    :ok = ReminderSender.send_reminder_on_interval("reminder", 50)
+    :ok = ReminderSender.snooze("reminder", 50)
+    :ok = ReminderSender.snooze("reminder", 100)
+
+    refute_receive(:called, 90)
+
+    # After the snooze, we should get repeated reminders (again, this is imperfect but good enough)
+    assert_receive(:called, 100)
+    assert_receive(:called, 100)
+    assert_receive(:called, 100)
+  end
+
   test "cannot snooze with no running timer" do
     start_supervised!({ReminderSender, %{"reminder" => fn -> nil end}})
     {:error, :no_timer} = ReminderSender.snooze("reminder", 1000)
