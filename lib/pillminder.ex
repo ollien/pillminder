@@ -4,9 +4,10 @@ defmodule Pillminder do
 
   @spec send_reminder_for_timer(Config.Timer) :: :ok | {:error, any}
   def send_reminder_for_timer(timer) do
-    ReminderSender.send_reminder_on_interval(timer.reminder_spacing,
-      send_immediately: true,
-      server_name: Pillminder.Application.reminder_sender_via_tuple(timer)
+    ReminderSender.send_reminder_on_interval(
+      timer.id,
+      timer.reminder_spacing,
+      send_immediately: true
     )
   end
 

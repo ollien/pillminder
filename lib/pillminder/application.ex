@@ -1,61 +1,52 @@
 defmodule Pillminder.Application do
   require Logger
 
+  alias Pillminder.ReminderSender.SendServer
   alias Pillminder.Scheduler
   alias Pillminder.ReminderSender
   alias Pillminder.Config
 
   use Application
 
-  @registry_name ReminderSender.Registry
-
   @impl true
   def start(_type, _args) do
     timers = Config.load_timers_from_env!()
-    timer_specs = Enum.map(timers, &make_reminder_sender_spec/1)
 
-    children =
-      [
-        {Registry, keys: :unique, name: @registry_name},
-        {Pillminder.ReminderSender.TimerSupervisor, nil}
-      ] ++
-        timer_specs ++
-        [
-          {Scheduler, make_scheduler_args(timers)},
-          # # TODO: Add port to config file
-          {Plug.Cowboy, scheme: :http, plug: Pillminder.WebRouter, options: [port: 8000]}
-        ]
+    children = [
+      # TODO: Start new reminder sender here
+      {Pillminder.ReminderSender, make_senders_for_timers(timers)},
+      {Scheduler, make_scheduler_args(timers)},
+      # # TODO: Add port to config file
+      {Plug.Cowboy, scheme: :http, plug: Pillminder.WebRouter, options: [port: 8000]}
+    ]
 
     Supervisor.start_link(children, strategy: :one_for_one, name: Pillminder.Supervisor)
   end
 
-  @spec reminder_sender_registry() :: module
-  def reminder_sender_registry(), do: @registry_name
-
-  @spec reminder_sender_via_tuple(Config.Timer) :: {:via, module(), {term(), term()}}
-  def reminder_sender_via_tuple(timer) do
-    {:via, Registry, {ReminderSender.Registry, make_reminder_sender_id(timer)}}
+  @spec make_senders_for_timers([Config.Timer.t()]) :: ReminderSender.senders()
+  defp make_senders_for_timers(timers) do
+    Enum.map(timers, &make_sender_for_timer/1) |> Map.new()
   end
 
-  @spec make_reminder_sender_spec(Config.Timer) :: Supervisor.child_spec()
-  defp make_reminder_sender_spec(timer) do
-    Supervisor.child_spec(
-      {
-        ReminderSender,
-        {fn ->
-           Logger.debug("Sending notification request to ntfy for #{timer.id}")
+  @spec make_sender_for_timer(Config.Timer.t()) ::
+          {ReminderSender.sender_id(), SendServer.remind_func()}
+  defp make_sender_for_timer(timer) do
+    {timer.id, make_remind_func_for_timer(timer)}
+  end
 
-           {:ok, resp} =
-             Pillminder.Ntfy.push_notification(
-               timer.ntfy_topic,
-               Pillminder.make_notification_body(timer)
-             )
+  @spec make_remind_func_for_timer(Config.Timer.t()) :: SendServer.remind_func()
+  defp make_remind_func_for_timer(timer) do
+    fn ->
+      Logger.debug("Sending notification request to ntfy for #{timer.id}")
 
-           Logger.debug("Got response from ntfy: #{inspect(resp)}")
-         end, name: reminder_sender_via_tuple(timer)}
-      },
-      id: make_reminder_sender_id(timer)
-    )
+      {:ok, resp} =
+        Pillminder.Ntfy.push_notification(
+          timer.ntfy_topic,
+          Pillminder.make_notification_body(timer)
+        )
+
+      Logger.debug("Got response from ntfy: #{inspect(resp)}")
+    end
   end
 
   @spec make_scheduler_args([Config.Timer.t()]) ::
@@ -77,15 +68,5 @@ defmodule Pillminder.Application do
         Logger.debug("Sent reminder for timer starting at #{timer.reminder_start_time}")
       end
     }
-  end
-
-  @spec make_reminder_sender_id(Config.Timer) :: String.t()
-  def make_reminder_sender_id(timer = %Config.Timer{}) do
-    make_reminder_sender_id(timer.id)
-  end
-
-  @spec make_reminder_sender_id(String.t()) :: String.t()
-  def make_reminder_sender_id(name) do
-    "ReminderSender:#{name}"
   end
 end

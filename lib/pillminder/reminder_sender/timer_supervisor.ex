@@ -6,6 +6,7 @@ defmodule Pillminder.ReminderSender.TimerSupervisor do
 
   use DynamicSupervisor
 
+  alias Pillminder.ReminderSender.SendServer
   alias Pillminder.ReminderSender.TimerAgent
 
   @spec start_link(any) :: Supervisor.on_start()
@@ -22,7 +23,7 @@ defmodule Pillminder.ReminderSender.TimerSupervisor do
   Start a timer agent that will call send_reminder_fn every interval. The task will be supervised, but will
   have a temporary restart strategy, so you may maintain a reference to its pid, and/or stop it if you wish.
   """
-  @spec start_timer_agent(number, Pillminder.ReminderSender.remind_func()) ::
+  @spec start_timer_agent(number, SendServer.remind_func()) ::
           {:ok, pid} | {:error, any}
   def start_timer_agent(interval, send_reminder_fn) do
     timer_agent_child_spec =
