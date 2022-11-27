@@ -160,27 +160,11 @@ defmodule Pillminder.ReminderSender.SendServer do
           {:reply, :ok, State.t()}
           | {:reply, {:error, :already_timing | any}, State.t()}
   def handle_call({:setup_reminder, interval, destination, send_strategy}, _from, state) do
-    logger_metadata = Logger.metadata()
-
-    task =
-      Task.Supervisor.async_nolink(
-        state.task_supervisor,
-        fn ->
-          # Inherit the metadata from the parent process
-          Logger.metadata(logger_metadata)
-
-          setup_interval_reminder(interval, destination, send_strategy, state)
-        end
-      )
-
-    case Task.yield(task, :infinity) do
-      {:ok, :ok} ->
+    case setup_interval_reminder(interval, destination, send_strategy, state) do
+      :ok ->
         {:reply, :ok, state}
 
-      {:ok, err = {:error, _reason}} ->
-        {:reply, err, state}
-
-      {:exit, reason} ->
+      {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
   end
@@ -225,27 +209,32 @@ defmodule Pillminder.ReminderSender.SendServer do
       GenServer.call(reminder_destination, :remind, interval)
     end
 
-    with {:ok, reminder_timer_pid} <-
-           make_reminder_timer(state.sender_id, interval, send_reminder_fn),
-         Process.link(reminder_timer_pid),
-         :ok <-
-           perform_send_strategy_tasks(send_strategy, state.task_supervisor, send_reminder_fn) do
-      # Now that we've brought everything online, we can unlink so our task can safely terminate
-      Process.unlink(reminder_timer_pid)
-      Logger.debug("Reminder timer for interval #{interval} has been stored and begun")
-      :ok
-    else
-      err = {:error, _reason} -> err
+    # TODO: I hate this nested case
+    case make_reminder_timer(state.sender_id, interval, send_reminder_fn) do
+      :ok ->
+        case perform_send_strategy_tasks(send_strategy, state.task_supervisor, send_reminder_fn) do
+          :ok ->
+            Logger.debug("Reminder timer for interval #{interval} has been stored and begun")
+            :ok
+
+          err = {:error, _reason} ->
+            # This really shouldn't fail, as we have just created the timer
+            :ok = TimerManager.cancel_timer(state.sender_id)
+            err
+        end
+
+      err = {:error, _reason} ->
+        err
     end
   end
 
   @spec make_reminder_timer(String.t(), number(), remind_func()) ::
-          {:ok, pid()} | {:error, :already_timing | {:spawn_reminder_timer, any()}}
+          :ok | {:error, :already_timing | {:spawn_reminder_timer, any()}}
   defp make_reminder_timer(id, interval, send_reminder_fn) do
     case TimerManager.start_reminder_timer(id, interval, send_reminder_fn) do
-      {:ok, reminder_timer} ->
+      :ok ->
         Logger.debug("Made reminder timer with interval #{interval}")
-        {:ok, reminder_timer}
+        :ok
 
       err = {:error, :already_timing} ->
         err

@@ -3,7 +3,7 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
   A timer that will periodically remind the user to take their medication, based on a given interval.
   """
 
-  use Agent
+  use GenServer
 
   alias Pillminder.Util.RunInterval
 
@@ -29,12 +29,15 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
   end
 
   def start_link({interval, send_reminder_fn, opts}) do
-    with {:ok, agent_pid} <-
-           Agent.start_link(fn -> make_initial_timer_state(interval, send_reminder_fn) end, opts),
-         # From the Agent docs, start_link will not return until the init function has returned, so we are guaranteed
-         # to have the result of apply_interval, whether failed or not.
-         :ok <- ensure_timer_started(agent_pid) do
-      {:ok, agent_pid}
+    GenServer.start_link(__MODULE__, {interval, send_reminder_fn}, opts)
+  end
+
+  @impl true
+  @spec init({non_neg_integer, (() -> any)}) :: {:ok, State.t()} | {:stop, any}
+  def init({interval, send_reminder_fn}) do
+    case make_initial_timer_state(interval, send_reminder_fn) do
+      {:ok, state} -> {:ok, state}
+      {:error, reason} -> {:stop, reason}
     end
   end
 
@@ -43,65 +46,64 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
   """
   @spec stop(Agent.agent(), atom, non_neg_integer | :infinity) :: any
   def stop(agent, reason \\ :normal, timeout \\ 5000) do
-    Agent.stop(agent, reason, timeout)
+    GenServer.stop(agent, reason, timeout)
   end
 
   @doc """
   Snooze the current timer
   """
-  @spec snooze(
-          Agent.agent(),
-          non_neg_integer,
-          non_neg_integer | :infinity
-        ) :: :ok
-  def snooze(agent, snooze_ms, timeout \\ 5000) do
-    Agent.update(
-      agent,
-      fn state = %State{
-           timer: {:interval_timer, timer_ref},
-           interval: interval
-         } ->
-        with :ok <- cancel_before_snooze(timer_ref),
-             {:ok, timer_ref} <- schedule_unsnooze(agent, snooze_ms, interval, timeout) do
-          Map.put(state, :timer, {:snoozed_timer, timer_ref})
-        else
-          # We really can't recover from something like this. We could attempt to reschedule the original interval
-          # timer but that would be difficult to deal with (what if that reschedule failed?)
-          {:error, reason} -> raise({:snooze_failed, reason})
-        end
-      end,
-      timeout
-    )
+  @spec snooze(GenServer.name(), non_neg_integer) :: :ok
+  def snooze(destination, snooze_ms) do
+    GenServer.call(destination, {:snooze, snooze_ms, destination})
   end
 
-  @spec make_initial_timer_state(number(), (() -> any())) :: State.t() | {:error, any()}
+  @impl true
+  def handle_call(
+        {:snooze, snooze_ms, unsnooze_destination},
+        _from,
+        state = %State{timer: {:interval_timer, timer_ref}}
+      ) do
+    with :ok <- cancel_before_snooze(timer_ref),
+         {:ok, timer_ref} <- schedule_unsnooze(unsnooze_destination, snooze_ms) do
+      updated_state = Map.put(state, :timer, {:snoozed_timer, timer_ref})
+      {:reply, :ok, updated_state}
+    else
+      # We really can't recover from something like this. We could attempt to reschedule the original interval
+      # timer but that would be difficult to deal with (what if that reschedule failed?)
+      {:error, reason} -> raise({:snooze_failed, reason})
+    end
+  end
+
+  @impl true
+  def handle_call(
+        :unsnooze,
+        _from,
+        %State{
+          timer: {:snoozed_timer, _timer_ref},
+          interval: interval,
+          remind_func: remind_func
+        }
+      ) do
+    # We really can't recover rom something like this. If this fails, we have neither of our timers running
+    # and crashing is the best we can do
+    {:ok, state} = reinitialize_after_snooze(interval, remind_func)
+    {:reply, :ok, state}
+  end
+
+  @spec make_initial_timer_state(number(), (() -> any())) :: {:ok, State.t()} | {:error, any()}
   defp make_initial_timer_state(interval, send_reminder_fn) do
     case RunInterval.apply_interval(interval, send_reminder_fn) do
       {:ok, timer_ref} ->
-        %State{
+        state = %State{
           timer: {:interval_timer, timer_ref},
           interval: interval,
           remind_func: send_reminder_fn
         }
 
+        {:ok, state}
+
       err = {:error, _err} ->
         err
-    end
-  end
-
-  @spec ensure_timer_started(pid()) :: :ok | {:error, {:timer_start_failed, any()}}
-  defp ensure_timer_started(agent_pid) do
-    case Agent.get(agent_pid, & &1) do
-      {:error, reason} ->
-        # Kill the agent so that it isn't hanging around with an error state
-        Agent.stop(agent_pid)
-        {:error, {:timer_start_failed, reason}}
-
-      %State{timer: {:interval_timer, _timer_ref}} ->
-        :ok
-
-      %State{timer: {:snoozed_timer, _timer_ref}} ->
-        :ok
     end
   end
 
@@ -113,16 +115,10 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
     end
   end
 
-  @spec schedule_unsnooze(
-          Agent.agent(),
-          non_neg_integer(),
-          non_neg_integer(),
-          non_neg_integer() | :infinity
-        ) :: {:ok, :timer.tref()} | {:error, any}
-  defp schedule_unsnooze(agent, snooze_ms, original_interval, timeout) do
+  defp schedule_unsnooze(destination, snooze_ms) do
     schedule_res =
       RunInterval.apply_after(snooze_ms, fn ->
-        reinitialize_after_snooze(agent, original_interval, timeout)
+        unsnooze(destination)
       end)
 
     case schedule_res do
@@ -131,15 +127,14 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
     end
   end
 
-  @spec reinitialize_after_snooze(Agent.agent(), non_neg_integer(), non_neg_integer() | :infinity) ::
-          :ok
-  defp reinitialize_after_snooze(agent, interval, timeout) do
-    Agent.update(
-      agent,
-      fn %State{timer: {:snoozed_timer, _timer_ref}, remind_func: remind_func} ->
-        make_initial_timer_state(interval, remind_func)
-      end,
-      timeout
-    )
+  defp unsnooze(destination) do
+    GenServer.call(destination, :unsnooze)
+  end
+
+  defp reinitialize_after_snooze(interval, remind_func) do
+    case make_initial_timer_state(interval, remind_func) do
+      {:ok, state} -> {:ok, state}
+      {:error, reason} -> {:error, {:unsnooze_failed, reason}}
+    end
   end
 end

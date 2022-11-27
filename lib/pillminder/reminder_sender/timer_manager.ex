@@ -29,19 +29,19 @@ defmodule Pillminder.ReminderSender.TimerManager do
 
   @doc """
   Start a reminder timer that will call send_reminder_fn every interval. The task will be supervised, but will
-  have a temporary restart strategy, so you may maintain a reference to its pid, and/or stop it if you wish.
+  not be restarted after a timer cancel.
   """
   @spec start_reminder_timer(any(), number, SendServer.remind_func()) ::
-          {:ok, pid} | {:error, any}
+          :ok | {:error, any}
   def start_reminder_timer(id, interval, send_reminder_fn) do
     reminder_timer_child_spec =
       Supervisor.child_spec(
         {ReminderTimer, {interval, send_reminder_fn, [name: make_via_tuple(id)]}},
-        restart: :temporary
+        restart: :transient
       )
 
     case DynamicSupervisor.start_child(@timer_supervisor_name, reminder_timer_child_spec) do
-      {:ok, pid} -> {:ok, pid}
+      {:ok, _pid} -> :ok
       :ignore -> {:error, :ignore}
       {:error, {:already_started, _}} -> {:error, :already_timing}
       err = {:error, _reason} -> err
