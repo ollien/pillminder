@@ -9,4 +9,5 @@ config :pillminder,
       reminder_start_time: ~T[08:00:00],
       ntfy_topic: "REPLACE_ME"
     ]
-  ]
+  ],
+  base_url: "http://127.0.0.1:8000"
