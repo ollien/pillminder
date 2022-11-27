@@ -1,4 +1,4 @@
-defmodule Pillminder.ReminderSender.TimerSupervisor do
+defmodule Pillminder.ReminderSender.TimerManager do
   @moduledoc """
   A supervisor used to keep track of interval timers.
   """

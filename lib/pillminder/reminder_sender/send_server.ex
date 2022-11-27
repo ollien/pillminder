@@ -8,7 +8,7 @@ defmodule Pillminder.ReminderSender.SendServer do
   require Logger
   alias Pillminder.Util.RunInterval
   alias Pillminder.ReminderSender.TimerAgent
-  alias Pillminder.ReminderSender.TimerSupervisor
+  alias Pillminder.ReminderSender.TimerManager
 
   use GenServer
 
@@ -227,7 +227,7 @@ defmodule Pillminder.ReminderSender.SendServer do
   @spec make_timer_agent(number(), remind_func()) ::
           {:ok, pid()} | {:error, {:spawn_reminder_timer, any()}}
   defp make_timer_agent(interval, send_reminder_fn) do
-    case TimerSupervisor.start_timer_agent(interval, send_reminder_fn) do
+    case TimerManager.start_timer_agent(interval, send_reminder_fn) do
       {:ok, timer_agent} ->
         Logger.debug("Made agent for timer with interval #{interval}")
         {:ok, timer_agent}

@@ -4,7 +4,7 @@ defmodule Pillminder.ReminderSender do
   This is intended to handle a single user's reminders; in a multi-user setup, there will be more than one
   ReminderSender.
   """
-  alias Pillminder.ReminderSender.TimerSupervisor
+  alias Pillminder.ReminderSender.TimerManager
   alias Pillminder.ReminderSender.SendServer
   use Supervisor
 
@@ -77,7 +77,7 @@ defmodule Pillminder.ReminderSender do
     children =
       [
         {Registry, keys: :unique, name: @registry_name},
-        {TimerSupervisor, nil}
+        {TimerManager, nil}
       ] ++ send_servers
 
     Supervisor.init(children, strategy: :one_for_one)
