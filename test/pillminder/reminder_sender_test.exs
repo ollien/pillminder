@@ -92,6 +92,35 @@ defmodule PillminderTest.ReminderSender do
     {:error, :no_timer} = ReminderSender.dismiss("reminder")
   end
 
+  test "snooze will delay interval reminders for the given amount of time" do
+    proc = self()
+    start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
+    :ok = ReminderSender.send_reminder_on_interval("reminder", 50)
+    :ok = ReminderSender.snooze("reminder", 100)
+
+    refute_receive(:called, 90)
+
+    # After the snooze, we should get repeated reminders (again, this is imperfect but good enough)
+    assert_receive(:called, 100)
+    assert_receive(:called, 100)
+    assert_receive(:called, 100)
+  end
+
+  test "cannot snooze with no running timer" do
+    start_supervised!({ReminderSender, %{"reminder" => fn -> nil end}})
+    {:error, :no_timer} = ReminderSender.snooze("reminder", 1000)
+  end
+
+  test "can cancel a snoozed timer" do
+    proc = self()
+    start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
+    :ok = ReminderSender.send_reminder_on_interval("reminder", 50)
+    :ok = ReminderSender.snooze("reminder", 50)
+    :ok = ReminderSender.dismiss("reminder")
+
+    refute_receive(:called, 100)
+  end
+
   test "continues to send interval reminder even if SendServer crashes" do
     proc = self()
 

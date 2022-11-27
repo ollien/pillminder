@@ -4,7 +4,7 @@ defmodule PillminderTest.Util.RunInterval do
   use ExUnit.Case, async: true
   doctest Pillminder.Util.RunInterval
 
-  test "calls target function repeatedly" do
+  test "apply_interval calls target function repeatedly" do
     proc = self()
     interval = 10
 
@@ -15,5 +15,15 @@ defmodule PillminderTest.Util.RunInterval do
     assert_receive(:data, 100)
     assert_receive(:data, 100)
     assert_receive(:data, 100)
+  end
+
+  test "apply_after calls target function once" do
+    proc = self()
+    interval = 10
+
+    RunInterval.apply_after(interval, fn -> send(proc, :data) end)
+
+    assert_receive(:data, 100)
+    refute_receive(:data, 100)
   end
 end

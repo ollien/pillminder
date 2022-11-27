@@ -60,6 +60,18 @@ defmodule Pillminder.ReminderSender.TimerManager do
     end
   end
 
+  @doc """
+  Cancel the timer with the given id. Returns :no_timer if the given timer does not exist.
+  """
+  @spec snooze_timer(any, non_neg_integer()) :: :ok | {:error, :no_timer}
+  def snooze_timer(id, snooze_ms) do
+    try do
+      TimerAgent.snooze(make_via_tuple(id), snooze_ms)
+    catch
+      :exit, {:noproc, _} -> {:error, :no_timer}
+    end
+  end
+
   defp make_via_tuple(id) do
     {:via, Registry, {@registry_name, id}}
   end

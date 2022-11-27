@@ -43,6 +43,12 @@ defmodule Pillminder.ReminderSender do
     SendServer.dismiss(server_name: destination)
   end
 
+  @spec snooze(sender_id, non_neg_integer()) :: any
+  def snooze(timer_id, snooze_time) do
+    destination = make_send_server_via_tuple(timer_id)
+    SendServer.snooze(snooze_time, server_name: destination)
+  end
+
   @doc """
     Call the reminder func, with a given timeout in milliseconds. NOTE: the "ok" variant here is used to indicate
     that the function was successfully called. If your function returns an :error tuple, for instance, you may

@@ -83,6 +83,12 @@ defmodule Pillminder.ReminderSender.SendServer do
     GenServer.call(destination, :dismiss)
   end
 
+  @spec snooze(non_neg_integer, keyword) :: :ok | {:error, :no_timer}
+  def snooze(snooze_time, opts \\ []) do
+    destination = Keyword.get(opts, :server_name, __MODULE__)
+    GenServer.call(destination, {:snooze, snooze_time})
+  end
+
   @doc """
     Call the reminder func, with a given timeout in milliseconds. NOTE: the "ok" variant here is used to indicate
     that the function was successfully called. If your function returns an :error tuple, for instance, you may
@@ -187,6 +193,23 @@ defmodule Pillminder.ReminderSender.SendServer do
     case TimerManager.cancel_timer(state.sender_id) do
       :ok -> {:reply, :ok, state}
       {:error, err} -> {:reply, {:error, err}, state}
+    end
+  end
+
+  @spec handle_call(:snooze, {pid, term}, State.t()) ::
+          {:reply, :ok | {:error, :no_timer | any}, State.t()}
+  def handle_call({:snooze, snooze_ms}, _from, state) do
+    snooze_minutes = fn ->
+      Timex.Duration.from_milliseconds(snooze_ms)
+      |> Timex.Duration.to_minutes()
+      |> (&:io_lib.format("~.2f", [&1])).()
+    end
+
+    Logger.debug("Snoozing timer for #{snooze_minutes.()} minutes")
+
+    case TimerManager.snooze_timer(state.sender_id, snooze_ms) do
+      :ok -> {:reply, :ok, state}
+      {:error, :no_timer} -> {:reply, {:error, :no_timer}, state}
     end
   end
 

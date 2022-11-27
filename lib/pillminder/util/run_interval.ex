@@ -5,12 +5,22 @@ defmodule Pillminder.Util.RunInterval do
   """
   @spec apply_interval(non_neg_integer, function, list) ::
           {:error, any} | {:ok, :timer.tref()}
-  def apply_interval(time, function) do
-    apply_interval(time, function, [])
+  def apply_interval(time, function, args \\ []) do
+    :timer.apply_interval(
+      time,
+      :erlang,
+      :apply,
+      [function, args]
+    )
   end
 
-  def apply_interval(time, function, args) do
-    :timer.apply_interval(
+  @doc """
+  Run the given function on the given interval. This is a thin wrapper around :timer.apply_after/4
+  to allow greater flexibility with Elixir. Given timer_refs can be cancelled with RunInterval.cancel
+  """
+  @spec apply_after(non_neg_integer, function, list) :: {:error, any} | {:ok, :timer.tref()}
+  def apply_after(time, function, args \\ []) do
+    :timer.apply_after(
       time,
       :erlang,
       :apply,
