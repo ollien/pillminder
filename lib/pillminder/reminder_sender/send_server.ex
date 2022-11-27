@@ -209,21 +209,19 @@ defmodule Pillminder.ReminderSender.SendServer do
       GenServer.call(reminder_destination, :remind, interval)
     end
 
-    # TODO: I hate this nested case
-    case make_reminder_timer(state.sender_id, interval, send_reminder_fn) do
-      :ok ->
-        case perform_send_strategy_tasks(send_strategy, state.task_supervisor, send_reminder_fn) do
-          :ok ->
-            Logger.debug("Reminder timer for interval #{interval} has been stored and begun")
-            :ok
-
-          err = {:error, _reason} ->
-            # This really shouldn't fail, as we have just created the timer
-            :ok = TimerManager.cancel_timer(state.sender_id)
-            err
-        end
+    with {_, :ok} <-
+           {:no_cleanup, make_reminder_timer(state.sender_id, interval, send_reminder_fn)},
+         :ok <-
+           perform_send_strategy_tasks(send_strategy, state.task_supervisor, send_reminder_fn) do
+      Logger.debug("Reminder timer for interval #{interval} has been stored and begun")
+      :ok
+    else
+      {:no_cleanup, err = {:error, _reason}} ->
+        err
 
       err = {:error, _reason} ->
+        # This really shouldn't fail, as we have just created the timer
+        :ok = TimerManager.cancel_timer(state.sender_id)
         err
     end
   end
