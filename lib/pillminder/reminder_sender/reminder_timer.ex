@@ -1,7 +1,6 @@
-defmodule Pillminder.ReminderSender.TimerAgent do
+defmodule Pillminder.ReminderSender.ReminderTimer do
   @moduledoc """
-  An agent that holds the state of a timer from `RunInterval.apply_interval/2`. `:timer.apply_interval/4` links
-  the interval to the process which spawns it, so we use an agent to act as that process.
+  A timer that will periodically remind the user to take their medication, based on a given interval.
   """
 
   use Agent

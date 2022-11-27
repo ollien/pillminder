@@ -7,7 +7,7 @@ defmodule Pillminder.ReminderSender.TimerManager do
   use Supervisor
 
   alias Pillminder.ReminderSender.SendServer
-  alias Pillminder.ReminderSender.TimerAgent
+  alias Pillminder.ReminderSender.ReminderTimer
 
   @timer_supervisor_name __MODULE__.TimerSupervisor
   @registry_name __MODULE__.Registry
@@ -28,19 +28,19 @@ defmodule Pillminder.ReminderSender.TimerManager do
   end
 
   @doc """
-  Start a timer agent that will call send_reminder_fn every interval. The task will be supervised, but will
+  Start a reminder timer that will call send_reminder_fn every interval. The task will be supervised, but will
   have a temporary restart strategy, so you may maintain a reference to its pid, and/or stop it if you wish.
   """
-  @spec start_timer_agent(any(), number, SendServer.remind_func()) ::
+  @spec start_reminder_timer(any(), number, SendServer.remind_func()) ::
           {:ok, pid} | {:error, any}
-  def start_timer_agent(id, interval, send_reminder_fn) do
-    timer_agent_child_spec =
+  def start_reminder_timer(id, interval, send_reminder_fn) do
+    reminder_timer_child_spec =
       Supervisor.child_spec(
-        {TimerAgent, {interval, send_reminder_fn, [name: make_via_tuple(id)]}},
+        {ReminderTimer, {interval, send_reminder_fn, [name: make_via_tuple(id)]}},
         restart: :temporary
       )
 
-    case DynamicSupervisor.start_child(@timer_supervisor_name, timer_agent_child_spec) do
+    case DynamicSupervisor.start_child(@timer_supervisor_name, reminder_timer_child_spec) do
       {:ok, pid} -> {:ok, pid}
       :ignore -> {:error, :ignore}
       {:error, {:already_started, _}} -> {:error, :already_timing}
@@ -54,7 +54,7 @@ defmodule Pillminder.ReminderSender.TimerManager do
   @spec cancel_timer(any) :: :ok | {:error, :no_timer}
   def cancel_timer(id) do
     try do
-      TimerAgent.stop(make_via_tuple(id))
+      ReminderTimer.stop(make_via_tuple(id))
     catch
       :exit, {:noproc, _} -> {:error, :no_timer}
     end
@@ -66,7 +66,7 @@ defmodule Pillminder.ReminderSender.TimerManager do
   @spec snooze_timer(any, non_neg_integer()) :: :ok | {:error, :no_timer}
   def snooze_timer(id, snooze_ms) do
     try do
-      TimerAgent.snooze(make_via_tuple(id), snooze_ms)
+      ReminderTimer.snooze(make_via_tuple(id), snooze_ms)
     catch
       :exit, {:noproc, _} -> {:error, :no_timer}
     end

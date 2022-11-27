@@ -16,7 +16,7 @@ defmodule Pillminder.ReminderSender.SendServer do
 
   defmodule State do
     @enforce_keys [:remind_func, :task_supervisor, :sender_id]
-    defstruct [:remind_func, :task_supervisor, :sender_id, timer_agent: :no_timer]
+    defstruct [:remind_func, :task_supervisor, :sender_id]
 
     @type t :: %__MODULE__{
             remind_func: Pillminder.ReminderSender.SendServer.remind_func(),
@@ -225,13 +225,13 @@ defmodule Pillminder.ReminderSender.SendServer do
       GenServer.call(reminder_destination, :remind, interval)
     end
 
-    with {:ok, timer_agent_pid} <-
-           make_timer_agent(state.sender_id, interval, send_reminder_fn),
-         Process.link(timer_agent_pid),
+    with {:ok, reminder_timer_pid} <-
+           make_reminder_timer(state.sender_id, interval, send_reminder_fn),
+         Process.link(reminder_timer_pid),
          :ok <-
            perform_send_strategy_tasks(send_strategy, state.task_supervisor, send_reminder_fn) do
       # Now that we've brought everything online, we can unlink so our task can safely terminate
-      Process.unlink(timer_agent_pid)
+      Process.unlink(reminder_timer_pid)
       Logger.debug("Reminder timer for interval #{interval} has been stored and begun")
       :ok
     else
@@ -239,13 +239,13 @@ defmodule Pillminder.ReminderSender.SendServer do
     end
   end
 
-  @spec make_timer_agent(String.t(), number(), remind_func()) ::
+  @spec make_reminder_timer(String.t(), number(), remind_func()) ::
           {:ok, pid()} | {:error, :already_timing | {:spawn_reminder_timer, any()}}
-  defp make_timer_agent(id, interval, send_reminder_fn) do
-    case TimerManager.start_timer_agent(id, interval, send_reminder_fn) do
-      {:ok, timer_agent} ->
-        Logger.debug("Made agent for timer with interval #{interval}")
-        {:ok, timer_agent}
+  defp make_reminder_timer(id, interval, send_reminder_fn) do
+    case TimerManager.start_reminder_timer(id, interval, send_reminder_fn) do
+      {:ok, reminder_timer} ->
+        Logger.debug("Made reminder timer with interval #{interval}")
+        {:ok, reminder_timer}
 
       err = {:error, :already_timing} ->
         err
