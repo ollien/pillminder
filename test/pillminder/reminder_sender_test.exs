@@ -110,7 +110,7 @@ defmodule PillminderTest.ReminderSender do
     proc = self()
     start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
     :ok = ReminderSender.send_reminder_on_interval("reminder", 50)
-    :ok = ReminderSender.snooze("reminder", 50)
+    :ok = ReminderSender.snooze("reminder", 75)
     :ok = ReminderSender.snooze("reminder", 100)
 
     refute_receive(:called, 90)
