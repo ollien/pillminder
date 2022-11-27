@@ -3,18 +3,20 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
   A timer that will periodically remind the user to take their medication, based on a given interval.
   """
 
-  use GenServer
-
+  require Logger
   alias Pillminder.Util.RunInterval
 
+  use GenServer
+
   defmodule State do
-    @enforce_keys [:timer, :interval, :remind_func]
-    defstruct [:timer, :interval, :remind_func]
+    @enforce_keys [:timer, :interval, :remind_func, :task_supervisor]
+    defstruct [:timer, :interval, :remind_func, :task_supervisor]
 
     @type t() :: %__MODULE__{
             timer: {:interval_timer | :snoozed_timer, :timer.tref()},
             interval: non_neg_integer(),
-            remind_func: (() -> any)
+            remind_func: (() -> any),
+            task_supervisor: pid()
           }
   end
 
@@ -22,19 +24,25 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
   Start a timer agent, which will call `RunInterval.apply_interval/2` with the given arguments. If {:ok, pid()} is
   returned, the pid is guaranteed to be an agent with an already-running timer ref
   """
-  @spec start_link({number(), (() -> any()), GenServer.options()}) ::
+  @spec start_link(
+          {id :: any, interval :: non_neg_integer, send_reminder_fun :: (() -> any()),
+           opts :: GenServer.options()}
+        ) ::
           {:ok, pid()} | {:error, any()}
-  def start_link({interval, send_reminder_fn}) do
-    start_link({interval, send_reminder_fn, []})
+  def start_link({id, interval, send_reminder_fn}) do
+    start_link({id, interval, send_reminder_fn, []})
   end
 
-  def start_link({interval, send_reminder_fn, opts}) do
-    GenServer.start_link(__MODULE__, {interval, send_reminder_fn}, opts)
+  def start_link({id, interval, send_reminder_fn, opts}) do
+    GenServer.start_link(__MODULE__, {id, interval, send_reminder_fn}, opts)
   end
 
   @impl true
-  @spec init({non_neg_integer, (() -> any)}) :: {:ok, State.t()} | {:stop, any}
-  def init({interval, send_reminder_fn}) do
+  @spec init({id :: any(), interval :: non_neg_integer, send_reminder_fn :: (() -> any)}) ::
+          {:ok, State.t()} | {:stop, any}
+  def init({id, interval, send_reminder_fn}) do
+    Logger.metadata(timer_id: id)
+
     case make_initial_timer_state(interval, send_reminder_fn) do
       {:ok, state} -> {:ok, state}
       {:error, reason} -> {:stop, reason}
@@ -78,32 +86,46 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
   def handle_call(
         :unsnooze,
         _from,
-        %State{
-          timer: {:snoozed_timer, _timer_ref},
-          interval: interval,
-          remind_func: remind_func
+        state = %State{
+          timer: {:snoozed_timer, _timer_ref}
         }
       ) do
-    # We really can't recover rom something like this. If this fails, we have neither of our timers running
-    # and crashing is the best we can do
-    {:ok, state} = reinitialize_after_snooze(interval, remind_func)
+    # Immediately try to kick off again; this is a fire and forget. What matters most is we start the timer again
+    send_initial_unsnooze_message(state.task_supervisor, state.remind_func)
+
+    # If this fails, we have neither of our timers running and crashing is the best we can do
+    {:ok, state} = reinitialize_after_snooze(state, state.interval, state.remind_func)
     {:reply, :ok, state}
   end
 
   @spec make_initial_timer_state(number(), (() -> any())) :: {:ok, State.t()} | {:error, any()}
   defp make_initial_timer_state(interval, send_reminder_fn) do
-    case RunInterval.apply_interval(interval, send_reminder_fn) do
-      {:ok, timer_ref} ->
-        state = %State{
-          timer: {:interval_timer, timer_ref},
-          interval: interval,
-          remind_func: send_reminder_fn
-        }
+    with {:ok, supervisor_pid} <- Task.Supervisor.start_link(),
+         {:ok, timer_ref} <- RunInterval.apply_interval(interval, send_reminder_fn) do
+      state = %State{
+        timer: {:interval_timer, timer_ref},
+        interval: interval,
+        remind_func: send_reminder_fn,
+        task_supervisor: supervisor_pid
+      }
 
-        {:ok, state}
-
+      {:ok, state}
+    else
       err = {:error, _err} ->
         err
+    end
+  end
+
+  @spec reinitialize_after_snooze(State.t(), non_neg_integer(), (() -> any())) ::
+          {:ok, State.t()} | {:error, {:unsnooze_failed, any()}}
+  defp reinitialize_after_snooze(state, interval, remind_func) do
+    case RunInterval.apply_interval(interval, remind_func) do
+      {:ok, timer} ->
+        updated_state = Map.put(state, :timer, {:interval_timer, timer})
+        {:ok, updated_state}
+
+      {:error, reason} ->
+        {:error, {:unsnooze_failed, reason}}
     end
   end
 
@@ -115,6 +137,8 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
     end
   end
 
+  @spec schedule_unsnooze(GenServer.name(), non_neg_integer()) ::
+          {:ok, :timer.tref()} | {:error, {:unsnooze_schedule_failed, any}}
   defp schedule_unsnooze(destination, snooze_ms) do
     schedule_res =
       RunInterval.apply_after(snooze_ms, fn ->
@@ -127,14 +151,31 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
     end
   end
 
+  @spec unsnooze(GenServer.name()) :: term
   defp unsnooze(destination) do
     GenServer.call(destination, :unsnooze)
   end
 
-  defp reinitialize_after_snooze(interval, remind_func) do
-    case make_initial_timer_state(interval, remind_func) do
-      {:ok, state} -> {:ok, state}
-      {:error, reason} -> {:error, {:unsnooze_failed, reason}}
+  @spec send_initial_unsnooze_message(pid(), (() -> any())) ::
+          {:ok, State.t()} | {:error, {:unsnooze_init_message_failed, any()}}
+  defp send_initial_unsnooze_message(supervisor, remind_func) do
+    case Task.Supervisor.start_child(supervisor, remind_func) do
+      {:ok, _} ->
+        :ok
+
+      {:ok, _, _} ->
+        :ok
+
+      :ignore ->
+        Logger.warning("Did not send initial reminder after unsnooze; task was ignored")
+        {:error, {:unsnooze_init_message_failed, :ignore}}
+
+      {:error, reason} ->
+        Logger.error(
+          "Failed to start task to send initial reminder after unsnooze #{inspect(reason)}"
+        )
+
+        {:error, {:unsnooze_init_message_failed, reason}}
     end
   end
 end

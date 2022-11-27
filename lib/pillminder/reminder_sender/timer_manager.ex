@@ -36,7 +36,7 @@ defmodule Pillminder.ReminderSender.TimerManager do
   def start_reminder_timer(id, interval, send_reminder_fn) do
     reminder_timer_child_spec =
       Supervisor.child_spec(
-        {ReminderTimer, {interval, send_reminder_fn, [name: make_via_tuple(id)]}},
+        {ReminderTimer, {id, interval, send_reminder_fn, [name: make_via_tuple(id)]}},
         restart: :transient
       )
 
