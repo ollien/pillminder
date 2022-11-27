@@ -12,10 +12,15 @@ defmodule Pillminder.ReminderSender.TimerAgent do
   Start a timer agent, which will call `RunInterval.apply_interval/2` with the given arguments. If {:ok, pid()} is
   returned, the pid is guaranteed to be an agent with an already-running timer ref
   """
-  @spec start_link({number(), (() -> any())}) :: {:ok, pid()} | {:error, any()}
+  @spec start_link({number(), (() -> any()), GenServer.options()}) ::
+          {:ok, pid()} | {:error, any()}
   def start_link({interval, send_reminder_fn}) do
+    start_link({interval, send_reminder_fn, []})
+  end
+
+  def start_link({interval, send_reminder_fn, opts}) do
     with {:ok, agent_pid} <-
-           Agent.start_link(fn -> make_initial_timer_state(interval, send_reminder_fn) end),
+           Agent.start_link(fn -> make_initial_timer_state(interval, send_reminder_fn) end, opts),
          # From the Agent docs, start_link will not return until the init function has returned, so we are guaranteed
          # to have the result of apply_interval, whether failed or not.
          :ok <- ensure_timer_started(agent_pid) do

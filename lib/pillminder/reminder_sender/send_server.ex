@@ -6,8 +6,6 @@ defmodule Pillminder.ReminderSender.SendServer do
   """
 
   require Logger
-  alias Pillminder.Util.RunInterval
-  alias Pillminder.ReminderSender.TimerAgent
   alias Pillminder.ReminderSender.TimerManager
 
   use GenServer
@@ -17,13 +15,13 @@ defmodule Pillminder.ReminderSender.SendServer do
   @type send_server_opts :: [sender_id: String.t(), server_opts: GenServer.options()]
 
   defmodule State do
-    @enforce_keys [:remind_func, :task_supervisor]
-    defstruct [:remind_func, :task_supervisor, timer_agent: :no_timer]
+    @enforce_keys [:remind_func, :task_supervisor, :sender_id]
+    defstruct [:remind_func, :task_supervisor, :sender_id, timer_agent: :no_timer]
 
     @type t :: %__MODULE__{
             remind_func: Pillminder.ReminderSender.SendServer.remind_func(),
-            task_supervisor: pid(),
-            timer_agent: pid() | :no_timer
+            sender_id: String.t(),
+            task_supervisor: pid()
           }
   end
 
@@ -106,6 +104,7 @@ defmodule Pillminder.ReminderSender.SendServer do
     case Task.Supervisor.start_link() do
       {:ok, supervisor_pid} ->
         initial_state = %State{
+          sender_id: sender_id,
           remind_func: remind_func,
           task_supervisor: supervisor_pid
         }
@@ -169,11 +168,11 @@ defmodule Pillminder.ReminderSender.SendServer do
       )
 
     case Task.yield(task, :infinity) do
-      {:ok, {:ok, output_state}} ->
-        {:reply, :ok, output_state}
+      {:ok, :ok} ->
+        {:reply, :ok, state}
 
-      {:ok, {err = {:error, _reason}, output_state}} ->
-        {:reply, err, output_state}
+      {:ok, err = {:error, _reason}} ->
+        {:reply, err, state}
 
       {:exit, reason} ->
         {:reply, {:error, reason}, state}
@@ -185,64 +184,51 @@ defmodule Pillminder.ReminderSender.SendServer do
   def handle_call(:dismiss, _from, state) do
     Logger.debug("Dismissing timer")
 
-    cancel_res = cancel_timer(state)
-
-    case cancel_res do
-      {:ok, next_state} -> {:reply, :ok, next_state}
+    case TimerManager.cancel_timer(state.sender_id) do
+      :ok -> {:reply, :ok, state}
       {:error, err} -> {:reply, {:error, err}, state}
     end
   end
 
-  @spec(
-    setup_interval_reminder(
-      number(),
-      GenServer.server(),
-      send_strategy(),
-      State.t()
-    ) :: {:ok, State.t()},
-    {{:error, any()}, State.t()}
-  )
-  defp setup_interval_reminder(interval, destination, send_strategy, state) do
+  @spec setup_interval_reminder(
+          number(),
+          GenServer.server(),
+          send_strategy(),
+          State.t()
+        ) :: :ok | {:error, any()}
+  defp setup_interval_reminder(interval, reminder_destination, send_strategy, state) do
     send_reminder_fn = fn ->
       # We want to time out the call once our next interval hits
-      GenServer.call(destination, :remind, interval)
+      GenServer.call(reminder_destination, :remind, interval)
     end
 
     with {:ok, timer_agent_pid} <-
-           make_timer_agent(interval, send_reminder_fn),
+           make_timer_agent(state.sender_id, interval, send_reminder_fn),
          Process.link(timer_agent_pid),
-         {:ok, updated_state} <- add_timer_to_state(state, timer_agent_pid),
          :ok <-
            perform_send_strategy_tasks(send_strategy, state.task_supervisor, send_reminder_fn) do
       # Now that we've brought everything online, we can unlink so our task can safely terminate
       Process.unlink(timer_agent_pid)
       Logger.debug("Reminder timer for interval #{interval} has been stored and begun")
-      {:ok, updated_state}
+      :ok
     else
-      err = {:error, _reason} ->
-        {err, state}
+      err = {:error, _reason} -> err
     end
   end
 
-  @spec make_timer_agent(number(), remind_func()) ::
-          {:ok, pid()} | {:error, {:spawn_reminder_timer, any()}}
-  defp make_timer_agent(interval, send_reminder_fn) do
-    case TimerManager.start_timer_agent(interval, send_reminder_fn) do
+  @spec make_timer_agent(String.t(), number(), remind_func()) ::
+          {:ok, pid()} | {:error, :already_timing | {:spawn_reminder_timer, any()}}
+  defp make_timer_agent(id, interval, send_reminder_fn) do
+    case TimerManager.start_timer_agent(id, interval, send_reminder_fn) do
       {:ok, timer_agent} ->
         Logger.debug("Made agent for timer with interval #{interval}")
         {:ok, timer_agent}
 
+      err = {:error, :already_timing} ->
+        err
+
       {:error, err} ->
         {:error, {:spawn_reminder_timer, err}}
-    end
-  end
-
-  @spec add_timer_to_state(state :: State.t(), timer_agent :: pid()) ::
-          {:ok, State.t()} | {:error, :already_timing | any()}
-  defp add_timer_to_state(state, timer_agent) do
-    case state.timer_agent do
-      :no_timer -> {:ok, Map.put(state, :timer_agent, timer_agent)}
-      _ -> {:error, :already_timing}
     end
   end
 
@@ -280,47 +266,6 @@ defmodule Pillminder.ReminderSender.SendServer do
         Logger.error("Failed to start send-immediate task: #{inspect(reason)}")
         {:error, reason}
     end
-  end
-
-  @spec cancel_timer(State.t()) :: {:ok, State.t()} | {:error, :no_timer | any}
-  defp cancel_timer(state) do
-    with {:ok, timer_ref, next_state} <- remove_timer_from_state(state),
-         :ok <- cancel_timer_ref(timer_ref) do
-      {:ok, next_state}
-    else
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  @spec cancel_timer(:timer.tref()) :: :ok | {:error, {:cancel_failed, any()}}
-  defp cancel_timer_ref(timer_ref) do
-    case RunInterval.cancel(timer_ref) do
-      :ok -> :ok
-      {:error, reason} -> {:error, {:cancel_failed, reason}}
-    end
-  end
-
-  @spec remove_timer_from_state(State.t()) ::
-          {:ok, :timer.tref(), State.t()} | {:error, :no_timer}
-  defp remove_timer_from_state(state) do
-    case state.timer_agent do
-      :no_timer ->
-        {:error, :no_timer}
-
-      _ ->
-        {timer_agent, no_timer_state} = Map.pop(state, :timer_agent)
-        new_state = Map.put(no_timer_state, :timer_agent, :no_timer)
-        timer_ref = extract_and_stop_agent(timer_agent)
-
-        {:ok, timer_ref, new_state}
-    end
-  end
-
-  defp extract_and_stop_agent(agent) do
-    value = TimerAgent.get_value(agent)
-    TimerAgent.stop(agent)
-
-    value
   end
 
   defp stringify_id(name) when is_atom(name) do

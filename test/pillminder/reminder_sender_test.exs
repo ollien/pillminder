@@ -95,7 +95,7 @@ defmodule PillminderTest.ReminderSender do
   test "continues to send interval reminder even if SendServer crashes" do
     proc = self()
 
-    pid = start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
+    start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
     :ok = ReminderSender.send_reminder_on_interval("reminder", 50, send_immediately: true)
 
     pid = ReminderSender._get_current_send_server_pid("reminder")
@@ -108,5 +108,36 @@ defmodule PillminderTest.ReminderSender do
     assert_receive(:called, 100)
     assert_receive(:called, 100)
     assert_receive(:called, 100)
+  end
+
+  test "can cancel interval reminder even if SendServer crashes" do
+    proc = self()
+
+    start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
+    :ok = ReminderSender.send_reminder_on_interval("reminder", 100, send_immediately: true)
+
+    pid = ReminderSender._get_current_send_server_pid("reminder")
+    assert pid != nil, "SendServer with expected name was nto found"
+
+    # Kill the process to simulate a crash
+    Process.exit(pid, :kill)
+
+    dismiss_task =
+      Task.async(fn ->
+        retry_until_alive(fn -> ReminderSender.dismiss("reminder") end)
+      end)
+
+    :ok = Task.await(dismiss_task)
+
+    # Imperfect, but by calling multiple times we can assume we are being called on an interval
+    refute_receive(:called, 200)
+  end
+
+  defp retry_until_alive(func) do
+    try do
+      func.()
+    catch
+      :exit, {:noproc, _} -> retry_until_alive(func)
+    end
   end
 end
