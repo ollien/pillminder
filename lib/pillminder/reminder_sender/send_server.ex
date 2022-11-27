@@ -14,6 +14,7 @@ defmodule Pillminder.ReminderSender.SendServer do
 
   @type remind_func :: (() -> any)
   @type send_strategy :: :send_immediately | :wait_until_interval
+  @type send_server_opts :: [sender_id: String.t(), server_opts: GenServer.options()]
 
   defmodule State do
     @enforce_keys [:remind_func, :task_supervisor]
@@ -30,15 +31,24 @@ defmodule Pillminder.ReminderSender.SendServer do
     start_link({remind_func, []})
   end
 
-  @spec start_link({remind_func, GenServer.options()}) ::
+  @doc """
+  Start a SendServer that is linked to the current pid, which wil send reminders to the given `remind_func`
+  The `opts` keyword list is used to configure custom SendServer options, which are as follows
+
+  - sender_id: A human-readable identifier for this server. If not, it is inferred from `server_opts[:name]`
+  - server_opts: Used to provide custom configuration for GenServer. See `GenServer` for more details
+  on these options.
+  """
+  @spec start_link({remind_func, send_server_opts}) ::
           {:ok, pid} | {:error, any} | :ignore
   def start_link({remind_func, opts}) do
-    full_opts = Keyword.put_new(opts, :name, __MODULE__)
+    server_opts = Keyword.get(opts, :server_opts, [])
+    full_opts = Keyword.put_new(server_opts, :name, __MODULE__)
 
     # A sender id is used to give a readable name in logs; if not included, we'll just use the registered name.
     # Via tuples are kind of hard to read so I don't really want to use them
     sender_id =
-      Keyword.get(opts, :sender_id, Keyword.get(opts, :name, __MODULE__)) |> stringify_id()
+      Keyword.get(opts, :sender_id, Keyword.get(server_opts, :name, __MODULE__)) |> stringify_id()
 
     GenServer.start_link(__MODULE__, {remind_func, sender_id}, full_opts)
   end
