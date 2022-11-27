@@ -1,8 +1,8 @@
 defmodule Pillminder.ReminderSender.SendServer do
   @moduledoc """
-  The ReminderSender handles sending mdeication reminders evenly spaced reminders, such as every few minutes.
+  The SendServer handles sending medication reminders evenly spaced reminders, such as every few minutes.
   This is intended to handle a single user's reminders; in a multi-user setup, there will be more than one
-  ReminderSender.
+  SendServer.
   """
 
   require Logger

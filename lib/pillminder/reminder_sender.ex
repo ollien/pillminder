@@ -1,9 +1,9 @@
 defmodule Pillminder.ReminderSender do
   @moduledoc """
-  The ReminderSender handles sending mdeication reminders evenly spaced reminders, such as every few minutes.
-  This is intended to handle a single user's reminders; in a multi-user setup, there will be more than one
-  ReminderSender.
+  The ReminderSender handles sending medication reminders evenly spaced reminders, such as every few minutes. It manages
+  many SendServers, one for each reminder.
   """
+
   alias Pillminder.ReminderSender.TimerManager
   alias Pillminder.ReminderSender.SendServer
   use Supervisor
