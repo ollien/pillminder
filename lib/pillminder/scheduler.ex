@@ -106,9 +106,7 @@ defmodule Pillminder.Scheduler do
       |> (&:io_lib.format("~.2f", [&1])).()
     end
 
-    Logger.info(
-      "Scheduling reminder for #{reminder.start_time} (in #{minutes_until.()} minutes))"
-    )
+    Logger.info("Scheduling reminder for #{reminder.start_time} (in #{minutes_until.()} minutes)")
 
     {:ok, _} =
       :timer.apply_after(
