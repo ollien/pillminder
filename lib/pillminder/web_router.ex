@@ -5,9 +5,9 @@ defmodule Pillminder.WebRouter do
 
   use Plug.Router
 
+  plug(Plug.Logger, log: :info)
   plug(:match)
   plug(:dispatch)
-  plug(Plug.Logger, log: :info)
 
   @snooze_time_param "snooze_time"
   @default_snooze_time Timex.Duration.from_hours(1)
