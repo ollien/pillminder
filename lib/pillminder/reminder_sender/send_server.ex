@@ -77,13 +77,13 @@ defmodule Pillminder.ReminderSender.SendServer do
     Call the reminder every interval milliseconds. An error is returned if there is no timer currently running,
     or the timer failed to cancel.
   """
-  @spec dismiss(server_name: GenServer.server()) :: :ok | {:error, :no_timer | any}
+  @spec dismiss(server_name: GenServer.server()) :: :ok | {:error, :not_timing | any}
   def dismiss(opts \\ []) do
     destination = Keyword.get(opts, :server_name, __MODULE__)
     GenServer.call(destination, :dismiss)
   end
 
-  @spec snooze(non_neg_integer, keyword) :: :ok | {:error, :no_timer}
+  @spec snooze(non_neg_integer, keyword) :: :ok | {:error, :not_timing}
   def snooze(snooze_time, opts \\ []) do
     destination = Keyword.get(opts, :server_name, __MODULE__)
     GenServer.call(destination, {:snooze, snooze_time})
@@ -170,7 +170,7 @@ defmodule Pillminder.ReminderSender.SendServer do
   end
 
   @spec handle_call(:dismiss, {pid, term}, State.t()) ::
-          {:reply, :ok | {:error, :no_timer | any}, State.t()}
+          {:reply, :ok | {:error, :not_timing | any}, State.t()}
   def handle_call(:dismiss, _from, state) do
     Logger.debug("Dismissing timer")
 
@@ -181,7 +181,7 @@ defmodule Pillminder.ReminderSender.SendServer do
   end
 
   @spec handle_call(:snooze, {pid, term}, State.t()) ::
-          {:reply, :ok | {:error, :no_timer | any}, State.t()}
+          {:reply, :ok | {:error, :not_timing | any}, State.t()}
   def handle_call({:snooze, snooze_ms}, _from, state) do
     snooze_minutes = fn ->
       Timex.Duration.from_milliseconds(snooze_ms)
@@ -193,7 +193,7 @@ defmodule Pillminder.ReminderSender.SendServer do
 
     case TimerManager.snooze_timer(state.sender_id, snooze_ms) do
       :ok -> {:reply, :ok, state}
-      {:error, :no_timer} -> {:reply, {:error, :no_timer}, state}
+      {:error, :not_timing} -> {:reply, {:error, :not_timing}, state}
     end
   end
 

@@ -89,7 +89,7 @@ defmodule PillminderTest.ReminderSender do
 
   test "cannot cancel when timer is not running" do
     start_supervised!({ReminderSender, %{"reminder" => fn -> nil end}})
-    {:error, :no_timer} = ReminderSender.dismiss("reminder")
+    {:error, :not_timing} = ReminderSender.dismiss("reminder")
   end
 
   test "snooze will delay interval reminders for the given amount of time" do
@@ -124,7 +124,7 @@ defmodule PillminderTest.ReminderSender do
 
   test "cannot snooze with no running timer" do
     start_supervised!({ReminderSender, %{"reminder" => fn -> nil end}})
-    {:error, :no_timer} = ReminderSender.snooze("reminder", 1000)
+    {:error, :not_timing} = ReminderSender.snooze("reminder", 1000)
   end
 
   test "can cancel a snoozed timer" do
@@ -178,11 +178,19 @@ defmodule PillminderTest.ReminderSender do
     refute_receive(:called, 200)
   end
 
+  test "does not crash for a non-existent sender" do
+    start_supervised!({ReminderSender, %{"reminder" => fn -> nil end}})
+
+    assert ReminderSender.send_reminder("non-existent") == {:error, :no_timer}
+    assert ReminderSender.send_reminder_on_interval("non-existent", 100) == {:error, :no_timer}
+    assert ReminderSender.dismiss("non-existent") == {:error, :no_timer}
+    assert ReminderSender.snooze("non-existent", 1000) == {:error, :no_timer}
+  end
+
   defp retry_until_alive(func) do
-    try do
-      func.()
-    catch
-      :exit, {:noproc, _} -> retry_until_alive(func)
+    case func.() do
+      {:error, :no_timer} -> retry_until_alive(func)
+      val -> val
     end
   end
 end

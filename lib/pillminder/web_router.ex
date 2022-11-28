@@ -14,7 +14,7 @@ defmodule Pillminder.WebRouter do
         Logger.info("Cleared timer id #{timer_id}")
         send_resp(conn, 200, "")
 
-      {:error, :no_timer} ->
+      {:error, :not_timing} ->
         Logger.debug("Attempted to dismiss timer id #{timer_id} but no timers are running")
         send_resp(conn, 200, "")
 

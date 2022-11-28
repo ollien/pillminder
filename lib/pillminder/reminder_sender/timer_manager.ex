@@ -49,26 +49,26 @@ defmodule Pillminder.ReminderSender.TimerManager do
   end
 
   @doc """
-  Cancel the timer with the given id. Returns :no_timer if the given timer does not exist.
+  Cancel the timer with the given id. Returns :not_timing if the given timer does not exist.
   """
-  @spec cancel_timer(any) :: :ok | {:error, :no_timer}
+  @spec cancel_timer(any) :: :ok | {:error, :not_timing}
   def cancel_timer(id) do
     try do
       ReminderTimer.stop(make_via_tuple(id))
     catch
-      :exit, {:noproc, _} -> {:error, :no_timer}
+      :exit, {:noproc, _} -> {:error, :not_timing}
     end
   end
 
   @doc """
-  Cancel the timer with the given id. Returns :no_timer if the given timer does not exist.
+  Cancel the timer with the given id. Returns :not_timing if the given timer does not exist.
   """
-  @spec snooze_timer(any, non_neg_integer()) :: :ok | {:error, :no_timer}
+  @spec snooze_timer(any, non_neg_integer()) :: :ok | {:error, :not_timing}
   def snooze_timer(id, snooze_ms) do
     try do
       ReminderTimer.snooze(make_via_tuple(id), snooze_ms)
     catch
-      :exit, {:noproc, _} -> {:error, :no_timer}
+      :exit, {:noproc, _} -> {:error, :not_timing}
     end
   end
 
