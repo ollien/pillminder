@@ -34,7 +34,16 @@ defmodule Pillminder.MixProject do
 
   defp aliases do
     [
-      test: "test --no-start"
+      test: &run_tests/1,
+      "test.with_logs": fn args ->
+        System.put_env("SHOW_LOGS", "1")
+        run_tests(args)
+      end
     ]
+  end
+
+  defp run_tests(args) do
+    Mix.env(:test)
+    Mix.Task.run("test", ["--no-start"] ++ args)
   end
 end
