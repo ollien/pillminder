@@ -17,7 +17,6 @@ defmodule Pillminder.WebRouter do
   delete "/timer/:timer_id" do
     case ReminderSender.dismiss(timer_id) do
       :ok ->
-        ReminderSender.dismiss(timer_id)
         Logger.info("Cleared timer id #{timer_id}")
         send_resp(conn, 200, "")
 
