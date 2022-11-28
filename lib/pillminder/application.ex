@@ -65,7 +65,7 @@ defmodule Pillminder.Application do
       scheduled_func: fn ->
         # The task supervisor in the Scheduler should re-run this, so it's ok to assert
         :ok = Pillminder.send_reminder_for_timer(timer)
-        Logger.debug("Sent reminder for timer starting at #{timer.reminder_start_time}")
+        Logger.info("Kicked off reminder for timer starting at #{timer.reminder_start_time}")
       end
     }
   end

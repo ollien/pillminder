@@ -34,7 +34,15 @@ defmodule Pillminder.WebRouter do
     conn = Plug.Conn.fetch_query_params(conn)
 
     with {:ok, params} <- parse_snooze_query_params(conn.query_params),
-         :ok <- ReminderSender.snooze(timer_id, Map.get(params, @snooze_time_param)) do
+         snooze_ms = Map.get(params, @snooze_time_param),
+         :ok <- ReminderSender.snooze(timer_id, snooze_ms) do
+      minutes_until = fn ->
+        Timex.Duration.from_milliseconds(snooze_ms)
+        |> Timex.Duration.to_minutes()
+        |> (&:io_lib.format("~.2f", [&1])).()
+      end
+
+      Logger.info("Cleared snoozed timer id #{timer_id} for #{minutes_until.()}")
       send_resp(conn, 200, "")
     else
       {:error, {:invalid_param, reason, {param, _}}} ->
