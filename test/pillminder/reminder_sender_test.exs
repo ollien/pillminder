@@ -4,6 +4,16 @@ defmodule PillminderTest.ReminderSender do
   use ExUnit.Case, async: true
   doctest Pillminder.ReminderSender
 
+  # Imperfect, but by calling multiple times we can assume we are being called on an interval
+  defmacro assert_receive_on_interval(msg, delay, n \\ 3) do
+    quote do
+      1..unquote(n)
+      |> Enum.each(fn _iteration ->
+        assert_receive(unquote(msg), unquote(delay))
+      end)
+    end
+  end
+
   test "calls target function when send_reminder is called" do
     {:ok, called_agent} = Agent.start_link(fn -> false end)
 
@@ -40,30 +50,24 @@ defmodule PillminderTest.ReminderSender do
 
   test "can remind on interval" do
     proc = self()
-
+    interval = 50
     start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
 
-    :ok = ReminderSender.send_reminder_on_interval("reminder", 50)
+    :ok = ReminderSender.send_reminder_on_interval("reminder", interval)
 
-    refute_receive(:called, 40)
-    # Imperfect, but by calling multiple times we can assume we are being called on an interval
-    assert_receive(:called, 100)
-    assert_receive(:called, 100)
-    assert_receive(:called, 100)
+    refute_receive(:called, interval - 10)
+    assert_receive_on_interval(:called, interval * 2)
   end
 
   test "can remind on interval and send immediately" do
     proc = self()
-
+    interval = 50
     start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
 
-    :ok = ReminderSender.send_reminder_on_interval("reminder", 50, send_immediately: true)
+    :ok = ReminderSender.send_reminder_on_interval("reminder", interval, send_immediately: true)
 
-    assert_receive(:called, 40)
-    # Imperfect, but by calling multiple times we can assume we are being called on an interval
-    assert_receive(:called, 100)
-    assert_receive(:called, 100)
-    assert_receive(:called, 100)
+    assert_receive(:called, interval - 10)
+    assert_receive_on_interval(:called, interval * 2)
   end
 
   test "can not start interval twice" do
@@ -78,8 +82,8 @@ defmodule PillminderTest.ReminderSender do
   test "can cancel timer" do
     proc = self()
     interval = 50
-
     start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
+
     :ok = ReminderSender.send_reminder_on_interval("reminder", interval)
 
     assert_receive(:called, interval * 2)
@@ -94,32 +98,36 @@ defmodule PillminderTest.ReminderSender do
 
   test "snooze will delay interval reminders for the given amount of time" do
     proc = self()
+    interval = 50
+    snooze_time = interval * 2
     start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
-    :ok = ReminderSender.send_reminder_on_interval("reminder", 50)
-    :ok = ReminderSender.snooze("reminder", 100)
+    :ok = ReminderSender.send_reminder_on_interval("reminder", interval)
+    :ok = ReminderSender.snooze("reminder", snooze_time)
 
-    refute_receive(:called, 90)
+    refute_receive(:called, interval * 2 - 10)
 
-    # After the snooze, we should get repeated reminders (again, this is imperfect but good enough)
-    assert_receive(:called, 100)
-    assert_receive(:called, 100)
-    assert_receive(:called, 100)
+    # After the snooze, we should get repeated reminders
+    # We should get one fairly immediately after the snooze timer ends
+    assert_receive(:called, snooze_time)
+    assert_receive_on_interval(:called, interval * 2)
   end
 
   test "snoozing twice will take the latter of the two lengths" do
     proc = self()
+    interval = 100
+    snooze_time = div(interval, 2)
     start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
-    :ok = ReminderSender.send_reminder_on_interval("reminder", 100)
+
+    :ok = ReminderSender.send_reminder_on_interval("reminder", interval)
     :ok = ReminderSender.snooze("reminder", 10000)
-    :ok = ReminderSender.snooze("reminder", 50)
+    :ok = ReminderSender.snooze("reminder", snooze_time)
 
-    refute_receive(:called, 50)
+    refute_receive(:called, snooze_time - 10)
 
-    # After the snooze, we should get repeated reminders (again, this is imperfect but good enough)
+    # After the snooze, we should get repeated reminders
     # We should get one fairly immediately after the snooze timer ends
-    assert_receive(:called, 50)
-    assert_receive(:called, 150)
-    assert_receive(:called, 150)
+    assert_receive(:called, snooze_time)
+    assert_receive_on_interval(:called, interval * 2)
   end
 
   test "cannot snooze with no running timer" do
@@ -129,19 +137,20 @@ defmodule PillminderTest.ReminderSender do
 
   test "can cancel a snoozed timer" do
     proc = self()
+    interval = 50
     start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
-    :ok = ReminderSender.send_reminder_on_interval("reminder", 50)
-    :ok = ReminderSender.snooze("reminder", 50)
+    :ok = ReminderSender.send_reminder_on_interval("reminder", interval)
+    :ok = ReminderSender.snooze("reminder", interval)
     :ok = ReminderSender.dismiss("reminder")
 
-    refute_receive(:called, 100)
+    refute_receive(:called, interval * 2)
   end
 
   test "continues to send interval reminder even if SendServer crashes" do
     proc = self()
-
+    interval = 50
     start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
-    :ok = ReminderSender.send_reminder_on_interval("reminder", 50, send_immediately: true)
+    :ok = ReminderSender.send_reminder_on_interval("reminder", interval, send_immediately: true)
 
     pid = ReminderSender._get_current_send_server_pid("reminder")
     assert pid != nil, "SendServer with expected name was nto found"
@@ -149,17 +158,14 @@ defmodule PillminderTest.ReminderSender do
     # Kill the process to simulate a crash
     Process.exit(pid, :kill)
 
-    # Imperfect, but by calling multiple times we can assume we are being called on an interval
-    assert_receive(:called, 100)
-    assert_receive(:called, 100)
-    assert_receive(:called, 100)
+    assert_receive_on_interval(:called, interval * 2)
   end
 
   test "can cancel interval reminder even if SendServer crashes" do
     proc = self()
-
+    interval = 100
     start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
-    :ok = ReminderSender.send_reminder_on_interval("reminder", 100, send_immediately: true)
+    :ok = ReminderSender.send_reminder_on_interval("reminder", interval, send_immediately: true)
 
     pid = ReminderSender._get_current_send_server_pid("reminder")
     assert pid != nil, "SendServer with expected name was nto found"
@@ -174,8 +180,7 @@ defmodule PillminderTest.ReminderSender do
 
     :ok = Task.await(dismiss_task)
 
-    # Imperfect, but by calling multiple times we can assume we are being called on an interval
-    refute_receive(:called, 200)
+    refute_receive(:called, interval * 2)
   end
 
   test "does not crash for a non-existent sender" do
