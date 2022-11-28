@@ -21,6 +21,13 @@ defmodule Pillminder do
           clear: true,
           url: URI.merge(get_base_url(), "/timer/#{URI.encode(timer.id)}"),
           method: "DELETE"
+        },
+        %{
+          action: "http",
+          label: "Snooze 1hr",
+          clear: true,
+          url: URI.merge(get_base_url(), "/timer/#{URI.encode(timer.id)}/snooze"),
+          method: "POST"
         }
       ]
     }
