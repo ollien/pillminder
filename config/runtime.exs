@@ -7,6 +7,8 @@ config :pillminder,
       # seconds
       reminder_spacing: 5,
       reminder_start_time: ~T[18:43:00],
+      # seconds
+      reminder_start_time_fudge: 10,
       ntfy_topic: "REPLACE_ME"
     ]
   ],
