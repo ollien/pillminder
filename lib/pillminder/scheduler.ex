@@ -37,19 +37,10 @@ defmodule Pillminder.Scheduler do
 
   @spec now!() :: DateTime.t()
   defp now!() do
-    case Timex.local() |> ok_or() do
+    case Timex.local() |> Util.Error.ok_or() do
       {:ok, now} -> now
       err -> raise "Could not get current time #{err}"
     end
-  end
-
-  @spec ok_or(value | {:error, err}) :: {:ok, value} | {:error, err} when value: any, err: any
-  defp ok_or(err = {:error, _}) do
-    err
-  end
-
-  defp ok_or(value) do
-    {:ok, value}
   end
 
   @spec get_next_scheduleable_times(reminders :: [ScheduledReminder.t()], now :: DateTime.t()) ::
@@ -62,25 +53,24 @@ defmodule Pillminder.Scheduler do
           {:cont, [{reminder, reminder_time} | acc]}
 
         {:error, err} ->
-          err_msg =
-            "Failed to determine next time for reminder with start time #{Time.to_iso8601(reminder.start_time)}: #{err}"
+          err_msg = ~s(Failed to determine next time for reminder "#{reminder.id}": #{err})
 
           {:halt, {:error, err_msg}}
       end
     end)
-    |> ok_or()
+    |> Util.Error.ok_or()
   end
 
   @spec get_next_scheduleable_time(reminder :: ScheduledReminder.t(), now :: DateTime.t()) ::
           {:ok, DateTime.t()} | {:error, String.t()}
   defp get_next_scheduleable_time(reminder, now) do
-    Util.Time.get_next_occurrence_of_time(now, reminder.start_time) |> ok_or()
+    reminder.start_time.(now)
   end
 
   @spec get_ms_until(DateTime.t(), DateTime.t()) ::
           {:ok, non_neg_integer()} | {:error, String.t()}
   defp get_ms_until(now, time) do
-    case Timex.diff(time, now, :milliseconds) |> ok_or() do
+    case Timex.diff(time, now, :milliseconds) |> Util.Error.ok_or() do
       {:ok, ms_until} ->
         {:ok, ms_until}
         {:ok, ms_until}
@@ -100,13 +90,7 @@ defmodule Pillminder.Scheduler do
           clock_source()
         ) :: :ok
   defp schedule_reminder(supervisor, reminder, ms_until, clock_source) do
-    minutes_until = fn ->
-      Timex.Duration.from_milliseconds(ms_until)
-      |> Timex.Duration.to_minutes()
-      |> (&:io_lib.format("~.2f", [&1])).()
-    end
-
-    Logger.info("Scheduling reminder for #{reminder.start_time} (in #{minutes_until.()} minutes)")
+    log_reminder_schedule(reminder, ms_until, clock_source)
 
     {:ok, _} =
       :timer.apply_after(
@@ -118,6 +102,26 @@ defmodule Pillminder.Scheduler do
       )
 
     :ok
+  end
+
+  defp log_reminder_schedule(reminder, ms_until, clock_source) do
+    get_start_time = fn ->
+      duration_until = Timex.Duration.from_milliseconds(ms_until)
+      now = clock_source.()
+
+      # this is technically approximate but it's just for a log so it's not a big deal if it's slightly off
+      Timex.add(now, duration_until)
+    end
+
+    minutes_until = fn ->
+      Timex.Duration.from_milliseconds(ms_until)
+      |> Timex.Duration.to_minutes()
+      |> (&:io_lib.format("~.2f", [&1])).()
+    end
+
+    Logger.info(
+      "Scheduling reminder \"#{reminder.id}\" for #{get_start_time.() |> DateTime.truncate(:second)} (in #{minutes_until.()} minutes)"
+    )
   end
 
   @spec run_and_reschedule(pid, ScheduledReminder.t(), clock_source()) :: nil

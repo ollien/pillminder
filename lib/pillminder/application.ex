@@ -61,7 +61,12 @@ defmodule Pillminder.Application do
   @spec make_reminder_for_scheduler(Config.Timer.t()) :: Scheduler.ScheduledReminder.t()
   defp make_reminder_for_scheduler(timer) do
     %Scheduler.ScheduledReminder{
-      start_time: timer.reminder_start_time,
+      id: timer.id,
+      start_time:
+        Scheduler.StartTime.next_possible_with_fudge(
+          timer.reminder_start_time,
+          timer.reminder_start_time_fudge
+        ),
       scheduled_func: fn ->
         # The task supervisor in the Scheduler should re-run this, so it's ok to assert
         :ok = Pillminder.send_reminder_for_timer(timer)

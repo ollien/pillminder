@@ -19,6 +19,7 @@ defmodule Pillminder.Config do
         id: config_timer[:id],
         reminder_spacing: config_timer[:reminder_spacing] * 1000,
         reminder_start_time: config_timer[:reminder_start_time],
+        reminder_start_time_fudge: config_timer[:reminder_start_time_fudge],
         ntfy_topic: config_timer[:ntfy_topic]
       },
       Pillminder.Config.Timer.s()

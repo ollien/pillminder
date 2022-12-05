@@ -3,11 +3,12 @@ defmodule Pillminder.Scheduler.ScheduledReminder do
   A ScheduledReminder is a reminder that the scheduler can use to begin kicking off the sending of reminders.
   """
 
-  @enforce_keys [:start_time, :scheduled_func]
-  defstruct [:start_time, :scheduled_func]
+  @enforce_keys [:id, :start_time, :scheduled_func]
+  defstruct [:id, :start_time, :scheduled_func, start_time_fudge: 0]
 
   @type t() :: %__MODULE__{
-          start_time: Time.t(),
+          id: String.t(),
+          start_time: Pillminder.Scheduler.StartTime.start_time_func(),
           scheduled_func: (() -> any())
         }
 end

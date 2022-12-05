@@ -18,7 +18,8 @@ defmodule PillminderTest.Scheduler do
        {
          [
            %{
-             start_time: ~T[09:00:00.250Z],
+             id: "my-timer",
+             start_time: Scheduler.StartTime.next_possible(~T[09:00:00.250Z]),
              scheduled_func: fn -> send(this_pid, :called) end
            }
          ],
@@ -33,7 +34,11 @@ defmodule PillminderTest.Scheduler do
     {:ok, times_agent_pid} =
       Agent.start_link(fn ->
         [
+          # This hack is silly but because the code calls clock_source twice, we duplicate our
+          # instances of the time given
           {{2022, 5, 15}, {9, 0, 0}},
+          {{2022, 5, 15}, {9, 0, 0}},
+          {{2022, 5, 16}, {9, 0, 0}},
           {{2022, 5, 16}, {9, 0, 0}}
         ]
       end)
@@ -45,7 +50,8 @@ defmodule PillminderTest.Scheduler do
        {
          [
            %{
-             start_time: ~T[09:00:00.250Z],
+             id: "my-timer",
+             start_time: Scheduler.StartTime.next_possible(~T[09:00:00.250Z]),
              scheduled_func: fn -> send(this_pid, :called) end
            }
          ],
@@ -64,7 +70,11 @@ defmodule PillminderTest.Scheduler do
     {:ok, times_agent_pid} =
       Agent.start_link(fn ->
         [
+          # This hack is silly but because the code calls clock_source twice, we duplicate our
+          # instances of the time given
           {{2022, 5, 15}, {9, 0, 0}},
+          {{2022, 5, 15}, {9, 0, 0}},
+          {{2022, 5, 16}, {9, 0, 0}},
           {{2022, 5, 16}, {9, 0, 0}}
         ]
       end)
@@ -76,7 +86,8 @@ defmodule PillminderTest.Scheduler do
        {
          [
            %{
-             start_time: ~T[09:00:00.250Z],
+             id: "my-timer",
+             start_time: Scheduler.StartTime.next_possible(~T[09:00:00.250Z]),
              scheduled_func: fn ->
                send(this_pid, :called)
                :erlang.error(:deliberate_crash)
