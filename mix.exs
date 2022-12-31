@@ -28,7 +28,9 @@ defmodule Pillminder.MixProject do
       {:plug_cowboy, "~> 2.6"},
       {:norm, "~> 0.13"},
       {:timex, "~> 3.7"},
-      {:gen_retry, "~> 1.4"}
+      {:gen_retry, "~> 1.4"},
+      {:ecto_sql, "~> 3.0"},
+      {:ecto_sqlite3, "~> 0.9.1"}
     ]
   end
 
@@ -44,6 +46,8 @@ defmodule Pillminder.MixProject do
 
   defp run_tests(args) do
     Mix.env(:test)
+    Mix.Task.run("ecto.create", ["--quiet"])
+    Mix.Task.run("ecto.migrate", ["--quiet"])
     Mix.Task.run("test", ["--no-start"] ++ args)
   end
 end

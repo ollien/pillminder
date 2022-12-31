@@ -6,3 +6,5 @@ config :tzdata,
   # Definitely a hack, but tzdata uses this key to determine which http client it uses, so if it
   # actually tries to use hackney, it will get an error
   http_client: nil
+
+config :pillminder, Pillminder.Stats.Repo, pool: Ecto.Adapters.SQL.Sandbox

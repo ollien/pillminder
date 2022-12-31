@@ -13,7 +13,7 @@ defmodule Pillminder.Application do
     timers = Config.load_timers_from_env!()
 
     children = [
-      # TODO: Start new reminder sender here
+      Pillminder.Stats.Repo,
       {Pillminder.ReminderSender, make_senders_for_timers(timers)},
       {Scheduler, make_scheduler_args(timers)},
       # # TODO: Add port to config file

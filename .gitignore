@@ -26,3 +26,5 @@ pillminder-*.tar
 /tmp/
 
 /.vscode
+
+/pillminder.db
