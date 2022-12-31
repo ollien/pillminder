@@ -7,7 +7,10 @@ defmodule PillminderTest.Stats do
 
   setup_all do
     {:ok, _} = Application.ensure_all_started(:ecto)
+    configure_tmpfile_repo(Stats.Repo)
     start_supervised!(Stats.Repo)
+    run_migrations()
+
     # We can only do this after we start the repo
     Ecto.Adapters.SQL.Sandbox.mode(Stats.Repo, :manual)
   end
@@ -18,6 +21,7 @@ defmodule PillminderTest.Stats do
 
     # Start tzdata, as the test's Timex needs it. test.exs disables network calls for this.
     {:ok, _} = Application.ensure_all_started(:tzdata)
+    :ok
   end
 
   describe "last_taken_at" do
@@ -73,5 +77,30 @@ defmodule PillminderTest.Stats do
 
       assert Timex.equal?(last_taken_at, taken_at)
     end
+  end
+
+  defp configure_tmpfile_repo(repo) do
+    {:ok, _} = Application.ensure_all_started(:briefly)
+
+    db_file =
+      Briefly.create!(prefix: "pillminderdb", directory: true)
+      |> Path.join("pillminder.db")
+
+    # This is a hack, but because briefly only lives for the lifetime of our process,
+    # We cannot create a tmpfile in test.exs or runtime.exs
+    repo_env =
+      Application.get_env(:pillminder, repo)
+      |> Keyword.put(:database, db_file)
+
+    Application.put_env(:pillminder, repo, repo_env)
+  end
+
+  defp run_migrations() do
+    Application.load(:pillminder)
+
+    Application.fetch_env!(:pillminder, :ecto_repos)
+    |> Enum.each(fn repo ->
+      {:ok, _, _} = Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :up, all: true))
+    end)
   end
 end
