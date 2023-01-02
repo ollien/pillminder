@@ -41,6 +41,88 @@ defmodule Pillminder.Stats do
     end
   end
 
+  @spec streak_length(String.t()) :: {:ok, number()} | {:error, any()}
+  def streak_length(timer_id) do
+    Repo.transaction(fn ->
+      {last_entry_before_gap(timer_id), most_recent_entry(timer_id)}
+    end)
+    |> case do
+      {:error, err} -> {:error, err}
+      {:ok, {streak_head, streak_tail}} -> {:ok, length_between_gaps(streak_head, streak_tail)}
+    end
+  end
+
+  @spec length_between_gaps(DateTime.t() | nil, DateTime.t() | nil) :: number()
+  defp length_between_gaps(_streak_head = nil, _streak_tail = nil) do
+    0
+  end
+
+  defp length_between_gaps(_streak_head, _streak_tail = nil) do
+    1
+  end
+
+  defp length_between_gaps(streak_head, streak_tail) do
+    Timex.diff(streak_tail, streak_head, :days) + 1
+  end
+
+  @spec most_recent_entry(String.t()) :: DateTime.t() | nil
+  defp most_recent_entry(timer_id) do
+    TakenLog
+    |> Ecto.Query.select([:taken_at])
+    |> Ecto.Query.where(timer: ^timer_id)
+    |> Ecto.Query.order_by(desc: :taken_at)
+    |> Ecto.Query.limit(1)
+    |> Repo.one()
+    |> case do
+      nil -> nil
+      %{taken_at: taken_at} -> taken_at
+    end
+  end
+
+  @spec last_entry_before_gap(String.t()) :: DateTime.t() | nil
+  defp last_entry_before_gap(timer_id) do
+    lag_query =
+      TakenLog
+      |> Ecto.Query.windows(last_taken_window: [order_by: [desc: :taken_at]])
+      |> Ecto.Query.select(
+        [entry],
+        %{
+          taken_at: entry.taken_at,
+          last_taken_at: lag(entry.taken_at, -1) |> over(:last_taken_window)
+        }
+      )
+      |> Ecto.Query.where(timer: ^timer_id)
+      |> Ecto.Query.subquery()
+
+    gap_query =
+      lag_query
+      |> Ecto.Query.select(
+        [entry],
+        %{
+          taken_at: entry.taken_at,
+          last_taken_at: entry.last_taken_at,
+          gap:
+            fragment("julianday(?)", entry.taken_at) -
+              fragment("julianday(?)", entry.last_taken_at)
+        }
+      )
+      |> Ecto.Query.order_by(desc: :taken_at)
+      |> Ecto.Query.subquery()
+
+    gap_query
+    # I don't know why, but if I use [:taken_at] instead of binding it like this, the datetime
+    # gets converted to a string for some reason.
+    |> Ecto.Query.select([entry], %{taken_at: entry.taken_at})
+    # Either it will be the last entry (indicating a nil gap), or there will be a space between two days
+    |> Ecto.Query.where([entry], is_nil(entry.gap) or entry.gap > 1)
+    |> Ecto.Query.limit(1)
+    |> Repo.one()
+    |> case do
+      nil -> nil
+      %{taken_at: taken_at} -> taken_at
+    end
+  end
+
   @spec in_utc(DateTime.t()) :: DateTime.t()
   defp in_utc(datetime) do
     utc_tz = Timex.Timezone.get("Etc/UTC", datetime)

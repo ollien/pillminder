@@ -79,6 +79,85 @@ defmodule PillminderTest.Stats do
     end
   end
 
+  describe "streak length" do
+    test "a timer with no entries give zero streak" do
+      {:ok, streak_length} = Stats.streak_length("test-pillminder")
+      assert streak_length == 0
+    end
+
+    test "a timer with an entry gives one streak" do
+      taken_at = ~U[2022-12-10 10:32:00Z]
+      :ok = Stats.record_taken("test-pillminder", taken_at)
+      {:ok, streak_length} = Stats.streak_length("test-pillminder")
+
+      assert streak_length == 1
+    end
+  end
+
+  test "a streak with no gap gives the length" do
+    base_taken_at = ~U[2022-12-10 10:32:00Z]
+
+    :ok =
+      Stats.record_taken(
+        "test-pillminder",
+        base_taken_at
+      )
+
+    :ok =
+      Stats.record_taken(
+        "test-pillminder",
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(1))
+      )
+
+    :ok =
+      Stats.record_taken(
+        "test-pillminder",
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(2))
+      )
+
+    :ok =
+      Stats.record_taken(
+        "test-pillminder",
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(3))
+      )
+
+    {:ok, streak_length} = Stats.streak_length("test-pillminder")
+
+    assert streak_length == 4
+  end
+
+  test "a gap in the streak produces the number of days after the gap" do
+    base_taken_at = ~U[2022-12-10 10:32:00Z]
+
+    :ok =
+      Stats.record_taken(
+        "test-pillminder",
+        base_taken_at
+      )
+
+    :ok =
+      Stats.record_taken(
+        "test-pillminder",
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(1))
+      )
+
+    :ok =
+      Stats.record_taken(
+        "test-pillminder",
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(3))
+      )
+
+    :ok =
+      Stats.record_taken(
+        "test-pillminder",
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(4))
+      )
+
+    {:ok, streak_length} = Stats.streak_length("test-pillminder")
+
+    assert streak_length == 2
+  end
+
   defp configure_tmpfile_repo(repo) do
     {:ok, _} = Application.ensure_all_started(:briefly)
 
