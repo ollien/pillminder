@@ -6,7 +6,8 @@ defmodule Pillminder.Stats do
   alias Pillminder.Stats.Repo
   alias Pillminder.Stats.TakenLog
 
-  @spec record_taken(String.t(), DateTime.t()) :: :ok | {:error, any()}
+  @spec record_taken(String.t(), DateTime.t()) ::
+          :ok | {:error, :already_taken_today | any()}
   def record_taken(timer_id, taken_at) do
     entry = %TakenLog{
       timer: timer_id,
@@ -18,8 +19,11 @@ defmodule Pillminder.Stats do
     |> TakenLog.changeset()
     |> Repo.insert()
     |> case do
-      {:ok, _entry} -> :ok
-      {:error, err} -> {:error, err}
+      {:ok, _entry} ->
+        :ok
+
+      {:error, err} ->
+        {:error, remap_recording_error(err)}
     end
   end
 
@@ -49,6 +53,31 @@ defmodule Pillminder.Stats do
     |> case do
       {:error, err} -> {:error, err}
       {:ok, {streak_head, streak_tail}} -> {:ok, length_between_gaps(streak_head, streak_tail)}
+    end
+  end
+
+  @spec remap_recording_error(t) :: :already_taken_today | t when t: any()
+  defp remap_recording_error(err) do
+    violated_constraints =
+      Ecto.Changeset.traverse_errors(
+        err,
+        fn
+          _changeset, :timer, {_msg, opts} ->
+            case opts[:constraint] do
+              :unique -> :already_taken_today
+              _ -> opts
+            end
+
+          _changeset, _field, {_msg, opts} ->
+            opts
+        end
+      )
+      |> Enum.into([])
+
+    case violated_constraints do
+      [timer: [:already_taken_today]] -> :already_taken_today
+      # If we don't know how to handle the error directly, we can bubble it up to the caller
+      _ -> err
     end
   end
 

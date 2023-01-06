@@ -57,7 +57,10 @@ defmodule PillminderTest.Stats do
 
     test "fails to insert two on the same day" do
       :ok = Stats.record_taken("test-pillminder", ~U[2022-12-10 10:30:00Z])
-      {:error, _} = Stats.record_taken("test-pillminder", ~U[2022-12-10 10:32:00Z])
+
+      {:error, :already_taken_today} =
+        Stats.record_taken("test-pillminder", ~U[2022-12-10 10:32:00Z])
+
       # No explicit assertion, the pattern match will cover this
     end
 
