@@ -38,6 +38,14 @@ defmodule PillminderTest.Stats do
       assert Timex.equal?(last_taken_at, taken_time)
     end
 
+    test "strips microseconds when recording time" do
+      taken_time = ~U[2022-12-12 10:30:00.500Z]
+      :ok = Stats.record_taken("test-pillminder", taken_time)
+      {:ok, last_taken_at} = Stats.last_taken_at("test-pillminder")
+
+      assert Timex.equal?(last_taken_at, ~U[2022-12-12 10:30:00Z])
+    end
+
     test "does not get a taken time from another timer" do
       taken_time = ~U[2022-12-12 10:30:00Z]
       :ok = Stats.record_taken("test-pillminder", taken_time)

@@ -11,7 +11,7 @@ defmodule Pillminder.Stats do
   def record_taken(timer_id, taken_at) do
     entry = %TakenLog{
       timer: timer_id,
-      taken_at: in_utc(taken_at),
+      taken_at: in_utc(taken_at) |> DateTime.truncate(:second),
       utc_offset: utc_offset(taken_at)
     }
 
