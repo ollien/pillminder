@@ -8,6 +8,7 @@ defmodule Pillminder.WebRouter do
   plug(:dispatch)
 
   forward("/timer", to: __MODULE__.Timer)
+  forward("/stats", to: __MODULE__.Stats)
 
   match _ do
     send_resp(conn, 404, "")
