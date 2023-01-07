@@ -12,6 +12,7 @@ defmodule Pillminder.ReminderSender do
   @type senders :: %{sender_id => SendServer.remind_func()}
 
   @registry_name __MODULE__.Registry
+  @task_supervisor_name __MODULE__.TaskSupervisor
 
   def start_link(senders) do
     Supervisor.start_link(__MODULE__, senders, name: __MODULE__)
@@ -81,7 +82,8 @@ defmodule Pillminder.ReminderSender do
     children =
       [
         {Registry, keys: :unique, name: @registry_name},
-        {TimerManager, nil}
+        {TimerManager, nil},
+        {Task.Supervisor, name: @task_supervisor_name}
       ] ++ send_servers
 
     Supervisor.init(children, strategy: :one_for_one)
@@ -91,7 +93,7 @@ defmodule Pillminder.ReminderSender do
   defp make_send_server_spec({timer_id, remind_func}) do
     Supervisor.child_spec(
       {SendServer,
-       {remind_func,
+       {remind_func, @task_supervisor_name,
         sender_id: make_send_server_id(timer_id),
         server_opts: [name: make_send_server_via_tuple(timer_id)]}},
       id: make_send_server_id(timer_id)

@@ -21,25 +21,31 @@ defmodule Pillminder.ReminderSender.SendServer do
     @type t :: %__MODULE__{
             remind_func: Pillminder.ReminderSender.SendServer.remind_func(),
             sender_id: String.t(),
-            task_supervisor: pid()
+            task_supervisor: Supervisor.supervisor()
           }
   end
 
-  def start_link({remind_func}) do
-    start_link({remind_func, []})
-  end
-
   @doc """
-  Start a SendServer that is linked to the current pid, which wil send reminders to the given `remind_func`
+  Start a SendServer that is linked to the current pid, which wil send reminders to the given `remind_func`. The
+  given Task.Supervisor reference will be used for one-off tasks being run during this server's lifetime.
+
   The `opts` keyword list is used to configure custom SendServer options, which are as follows
 
   - sender_id: A human-readable identifier for this server. If not, it is inferred from `server_opts[:name]`
   - server_opts: Used to provide custom configuration for GenServer. See `GenServer` for more details
   on these options.
   """
-  @spec start_link({remind_func, send_server_opts}) ::
+
+  @spec start_link(
+          {remind_func, Supervisor.t(), send_server_opts}
+          | {remind_func, Supervisor.t(), send_server_opts}
+        ) ::
           {:ok, pid} | {:error, any} | :ignore
-  def start_link({remind_func, opts}) do
+  def start_link({remind_func, task_supervisor}) when not is_list(task_supervisor) do
+    start_link({remind_func, task_supervisor, []})
+  end
+
+  def start_link({remind_func, task_supervisor, opts}) when is_list(opts) do
     server_opts = Keyword.get(opts, :server_opts, [])
     full_opts = Keyword.put_new(server_opts, :name, __MODULE__)
 
@@ -48,7 +54,7 @@ defmodule Pillminder.ReminderSender.SendServer do
     sender_id =
       Keyword.get(opts, :sender_id, Keyword.get(server_opts, :name, __MODULE__)) |> stringify_id()
 
-    GenServer.start_link(__MODULE__, {remind_func, sender_id}, full_opts)
+    GenServer.start_link(__MODULE__, {remind_func, task_supervisor, sender_id}, full_opts)
   end
 
   @doc """
@@ -103,23 +109,17 @@ defmodule Pillminder.ReminderSender.SendServer do
   end
 
   @impl true
-  @spec init({remind_func, String.t()}) :: {:ok, State.t()}
-  def init({remind_func, sender_id}) do
+  @spec init({remind_func, Supervisor.supervisor(), String.t()}) :: {:ok, State.t()}
+  def init({remind_func, task_supervisor, sender_id}) do
     Logger.metadata(sender_id: sender_id)
 
-    case Task.Supervisor.start_link() do
-      {:ok, supervisor_pid} ->
-        initial_state = %State{
-          sender_id: sender_id,
-          remind_func: remind_func,
-          task_supervisor: supervisor_pid
-        }
+    initial_state = %State{
+      sender_id: sender_id,
+      remind_func: remind_func,
+      task_supervisor: task_supervisor
+    }
 
-        {:ok, initial_state}
-
-      {:error, err} ->
-        {:stop, err}
-    end
+    {:ok, initial_state}
   end
 
   @impl true
