@@ -1,14 +1,12 @@
-import React, { useState } from 'react';
-import { BeatLoader } from 'react-spinners'
+import React, { useState } from "react";
+import { BeatLoader } from "react-spinners";
 import { Button, Flex, FormControl, FormLabel, Input } from "@chakra-ui/react";
 
-const LoginForm = () =>
-{
+const LoginForm = () => {
 	const [isLoading, setIsLoading] = useState<boolean>(false);
-	const submit = () =>
-	{
+	const submit = () => {
 		setIsLoading(true);
-	}
+	};
 
 	return (
 		<>
@@ -30,7 +28,7 @@ const LoginForm = () =>
 				</Button>
 			</FormControl>
 		</>
-	)
-}
+	);
+};
 
 export default LoginForm;

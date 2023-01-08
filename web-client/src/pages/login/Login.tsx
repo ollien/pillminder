@@ -1,6 +1,13 @@
-import { Card, CardBody, CardHeader, Center, Container, Flex, Heading } from '@chakra-ui/react';
-import React from 'react';
-import LoginForm from './LoginForm';
+import {
+	Card,
+	CardBody,
+	CardHeader,
+	Center,
+	Container,
+	Heading,
+} from "@chakra-ui/react";
+import React from "react";
+import LoginForm from "./LoginForm";
 
 const BACKGROUND_COLOR = "#37474F";
 
@@ -16,7 +23,7 @@ const Login = () => (
 				</CardBody>
 			</Card>
 		</Container>
-	</Center >
-)
+	</Center>
+);
 
 export default Login;
