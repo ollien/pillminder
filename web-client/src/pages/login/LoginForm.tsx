@@ -9,6 +9,10 @@ import { Field, Form, Formik, FieldProps } from "formik";
 import React from "react";
 import { BeatLoader } from "react-spinners";
 
+interface FormData {
+	pillminder: string;
+}
+
 const validateRequired = (value: string) => {
 	if (value) {
 		return undefined;
@@ -17,13 +21,17 @@ const validateRequired = (value: string) => {
 	return "Required field";
 };
 
-interface FormData {
-	pillminder: string;
-}
+const redirectToStatsPage = (pillminder: string) => {
+	// TODO: This is a bit silly, but will work for an initial prototype.
+	// In the future, I want this to send to the webserver so we can have some kind of authentication,
+	// and let that direct us to the stats page.
+	window.location.href =
+		"stats.html?pillminder=" + encodeURIComponent(pillminder);
+};
 
 const LoginForm = () => {
 	const submit = (values: FormData, _formikBag) => {
-		console.log(values);
+		redirectToStatsPage(values.pillminder);
 	};
 
 	return (
