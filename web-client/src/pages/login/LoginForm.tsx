@@ -1,5 +1,3 @@
-import React from "react";
-import { BeatLoader } from "react-spinners";
 import {
 	Button,
 	FormControl,
@@ -7,7 +5,9 @@ import {
 	FormLabel,
 	Input,
 } from "@chakra-ui/react";
-import { Field, Form, Formik, FieldProps, FormikBag } from "formik";
+import { Field, Form, Formik, FieldProps } from "formik";
+import React from "react";
+import { BeatLoader } from "react-spinners";
 
 const validateRequired = (value: string) => {
 	if (value) {
@@ -22,7 +22,7 @@ interface FormData {
 }
 
 const LoginForm = () => {
-	const submit = (values: FormData, { setSubmitting }) => {
+	const submit = (values: FormData, _formikBag) => {
 		console.log(values);
 	};
 

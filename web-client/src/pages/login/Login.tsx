@@ -1,3 +1,4 @@
+import LoginForm from "./LoginForm";
 import {
 	Card,
 	CardBody,
@@ -7,7 +8,6 @@ import {
 	Heading,
 } from "@chakra-ui/react";
 import React from "react";
-import LoginForm from "./LoginForm";
 
 const BACKGROUND_COLOR = "#37474F";
 
