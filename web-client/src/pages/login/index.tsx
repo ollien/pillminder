@@ -1,11 +1,12 @@
 import Login from "./Login";
 import { ChakraProvider } from "@chakra-ui/react";
 import React from "react";
-import { render } from "react-dom";
+import { createRoot } from "react-dom/client";
 
-render(
+const rootElement = document.getElementById("root");
+const reactRoot = createRoot(rootElement!);
+reactRoot.render(
 	<ChakraProvider>
 		<Login />
-	</ChakraProvider>,
-	document.getElementById("root")
+	</ChakraProvider>
 );
