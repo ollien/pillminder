@@ -3,7 +3,7 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 
 module.exports = {
 	entry: {
-		index: "./src/pages/login/index.tsx",
+		login: "./src/pages/login/index.tsx",
 		stats: "./src/pages/stats/index.tsx",
 	},
 	resolve: {
@@ -20,7 +20,7 @@ module.exports = {
 		new HtmlWebpackPlugin({
 			filename: "login.html",
 			template: "./html/login.html",
-			chunks: ["index"],
+			chunks: ["login"],
 		}),
 		new HtmlWebpackPlugin({
 			filename: "stats.html",
