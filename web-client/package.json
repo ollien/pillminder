@@ -1,4 +1,9 @@
 {
+	"name": "pillminder-webclient",
+	"private": true,
+	"exports": {
+		"./src/*": "./src/*"
+	},
 	"scripts": {
 		"lint": "eslint .",
 		"format": "prettier -w ."

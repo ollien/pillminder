@@ -6,7 +6,7 @@ import {
 	Input,
 } from "@chakra-ui/react";
 import { Field, Form, Formik, FieldProps } from "formik";
-import React from "react";
+import * as React from "react";
 import { BeatLoader } from "react-spinners";
 
 interface FormData {
@@ -30,7 +30,7 @@ const redirectToStatsPage = (pillminder: string) => {
 };
 
 const LoginForm = () => {
-	const submit = (values: FormData, _formikBag) => {
+	const submit = (values: FormData) => {
 		redirectToStatsPage(values.pillminder);
 	};
 
