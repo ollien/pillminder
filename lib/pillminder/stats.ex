@@ -56,6 +56,26 @@ defmodule Pillminder.Stats do
     end
   end
 
+  @spec streak_length(String.t(), Date.t()) :: {:ok, number()} | {:error, any()}
+  def streak_length(timer_id, today) do
+    Repo.transaction(fn ->
+      with {:last_taken, {:ok, last_taken_at}} when last_taken_at != nil <-
+             {:last_taken, last_taken_at(timer_id)},
+           {:time_diff, {:ok, days_since}} <-
+             {:time_diff, days_between(today, last_taken_at |> DateTime.to_date())} do
+        if days_since > 1 do
+          0
+        else
+          streak_length(timer_id) |> Util.Error.or_error()
+        end
+      else
+        {:last_taken, {:ok, nil}} -> 0
+        # TODO: maybe we wish to provide some detail on what part failed
+        {_stage, err = {:error, _reason}} -> err
+      end
+    end)
+  end
+
   @spec remap_recording_error(t) :: :already_taken_today | t when t: any()
   defp remap_recording_error(err) do
     violated_constraints =
@@ -79,6 +99,12 @@ defmodule Pillminder.Stats do
       # If we don't know how to handle the error directly, we can bubble it up to the caller
       _ -> err
     end
+  end
+
+  @spec days_between(Date.t(), Date.t()) :: {:ok, number()} | {:error, any()}
+  defp days_between(end_date, start_date) do
+    Timex.diff(end_date, start_date, :days)
+    |> Util.Error.ok_or()
   end
 
   @spec length_between_gaps(DateTime.t() | nil, DateTime.t() | nil) :: number()

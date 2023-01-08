@@ -96,6 +96,11 @@ defmodule PillminderTest.Stats do
       assert streak_length == 0
     end
 
+    test "a timer with no entries give zero streak and a date provided" do
+      {:ok, streak_length} = Stats.streak_length("test-pillminder", ~D[2022-12-10])
+      assert streak_length == 0
+    end
+
     test "a timer with an entry gives one streak" do
       taken_at = ~U[2022-12-10 10:32:00Z]
       :ok = Stats.record_taken("test-pillminder", taken_at)
@@ -103,70 +108,118 @@ defmodule PillminderTest.Stats do
 
       assert streak_length == 1
     end
-  end
 
-  test "a streak with no gap gives the length" do
-    base_taken_at = ~U[2022-12-10 10:32:00Z]
+    test "a streak with no gap gives the length" do
+      base_taken_at = ~U[2022-12-10 10:32:00Z]
 
-    :ok =
-      Stats.record_taken(
-        "test-pillminder",
-        base_taken_at
-      )
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at
+        )
 
-    :ok =
-      Stats.record_taken(
-        "test-pillminder",
-        base_taken_at |> Timex.subtract(Timex.Duration.from_days(1))
-      )
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(1))
+        )
 
-    :ok =
-      Stats.record_taken(
-        "test-pillminder",
-        base_taken_at |> Timex.subtract(Timex.Duration.from_days(2))
-      )
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(2))
+        )
 
-    :ok =
-      Stats.record_taken(
-        "test-pillminder",
-        base_taken_at |> Timex.subtract(Timex.Duration.from_days(3))
-      )
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(3))
+        )
 
-    {:ok, streak_length} = Stats.streak_length("test-pillminder")
+      {:ok, streak_length} = Stats.streak_length("test-pillminder")
 
-    assert streak_length == 4
-  end
+      assert streak_length == 4
+    end
 
-  test "a gap in the streak produces the number of days after the gap" do
-    base_taken_at = ~U[2022-12-10 10:32:00Z]
+    test "a gap in the streak produces the number of days after the gap" do
+      base_taken_at = ~U[2022-12-10 10:32:00Z]
 
-    :ok =
-      Stats.record_taken(
-        "test-pillminder",
-        base_taken_at
-      )
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at
+        )
 
-    :ok =
-      Stats.record_taken(
-        "test-pillminder",
-        base_taken_at |> Timex.subtract(Timex.Duration.from_days(1))
-      )
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(1))
+        )
 
-    :ok =
-      Stats.record_taken(
-        "test-pillminder",
-        base_taken_at |> Timex.subtract(Timex.Duration.from_days(3))
-      )
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(3))
+        )
 
-    :ok =
-      Stats.record_taken(
-        "test-pillminder",
-        base_taken_at |> Timex.subtract(Timex.Duration.from_days(4))
-      )
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(4))
+        )
 
-    {:ok, streak_length} = Stats.streak_length("test-pillminder")
+      {:ok, streak_length} = Stats.streak_length("test-pillminder")
 
-    assert streak_length == 2
+      assert streak_length == 2
+    end
+
+    test "providing a date invalidates the streak if we've missed a day" do
+      base_taken_at = ~U[2022-12-10 10:32:00Z]
+
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at
+        )
+
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(1))
+        )
+
+      {:ok, streak_length} =
+        Stats.streak_length(
+          "test-pillminder",
+          base_taken_at |> DateTime.to_date() |> Timex.add(Timex.Duration.from_days(2))
+        )
+
+      assert streak_length == 0
+    end
+
+    test "providing a date keeps the streak if it's the day after" do
+      base_taken_at = ~U[2022-12-10 10:32:00Z]
+
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at
+        )
+
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(1))
+        )
+
+      {:ok, streak_length} =
+        Stats.streak_length(
+          "test-pillminder",
+          base_taken_at |> DateTime.to_date() |> Timex.add(Timex.Duration.from_days(1))
+        )
+
+      assert streak_length == 2
+    end
   end
 
   defp configure_tmpfile_repo(repo) do

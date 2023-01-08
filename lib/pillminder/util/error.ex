@@ -17,4 +17,23 @@ defmodule Pillminder.Util.Error do
   def ok_or(value) do
     {:ok, value}
   end
+
+  @doc """
+  The inverse of ok_or
+
+  ## Examples
+      iex> Pillminder.Util.Error.or_error({:ok, 23})
+      23
+
+      iex> Pillminder.Util.Error.ok_or({:error, :not_found})
+      {:error, :not_found}
+  """
+  @spec or_error({:ok, value} | {:error, err}) :: value | {:error, err} when value: any, err: any
+  def or_error({:ok, value}) do
+    value
+  end
+
+  def or_error(err = {:error, _reason}) do
+    err
+  end
 end
