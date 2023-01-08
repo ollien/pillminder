@@ -7,7 +7,7 @@ module.exports = {
 		stats: './src/pages/stats/index.tsx',
 	},
 	resolve: {
-		extensions: ['.ts', '.tsx'],
+		extensions: ['.js', '.mjs', '.ts', '.tsx'],
 	},
 	module: {
 		rules: [
