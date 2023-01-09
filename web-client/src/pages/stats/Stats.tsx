@@ -94,10 +94,12 @@ const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 
 	return (
 		<Center h="100%" flexDirection="column" backgroundColor={colors.BACKGROUND}>
-			<Container>
+			<Container maxW="container.md">
 				<Card backgroundColor="white" shadow="2xl">
 					<CardHeader>
-						<Heading size="md">{getHeadingMsg(pillminder)}</Heading>
+						<Heading size={{ base: "lg", lg: "md" }}>
+							{getHeadingMsg(pillminder)}
+						</Heading>
 					</CardHeader>
 					<CardBody width="100%">
 						{error == null ? statsSummaryElement : errorElement}

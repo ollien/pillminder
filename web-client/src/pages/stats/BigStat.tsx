@@ -9,10 +9,10 @@ interface BigStatProps {
 const BigStat = ({ value, name }: BigStatProps) => {
 	return (
 		<Stack textAlign="center">
-			<Text fontSize="6xl" lineHeight="0.5">
+			<Text fontSize={{ base: "5rem", lg: "4rem" }} lineHeight="0.5">
 				{value}
 			</Text>
-			<Text fontSize="md">{name}</Text>
+			<Text fontSize="lg">{name}</Text>
 		</Stack>
 	);
 };
