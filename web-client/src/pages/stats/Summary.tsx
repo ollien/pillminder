@@ -12,7 +12,10 @@ const formatLastTakenOn = (lastTakenOn: Date | null) => {
 };
 
 const Summary = ({ statsSummary }: { statsSummary: StatsSummary }) => (
-	<Stack direction="row" justifyContent="space-around" alignItems="">
+	<Stack
+		direction={{ base: "column", sm: "row" }}
+		justifyContent="space-around"
+	>
 		<BigStat value={`${statsSummary?.streakLength}`} name="Streak" />
 		<BigStat
 			value={formatLastTakenOn(statsSummary?.lastTaken)}
