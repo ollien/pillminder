@@ -6,7 +6,7 @@ import {
 	Input,
 } from "@chakra-ui/react";
 import { Field, Form, Formik, FieldProps } from "formik";
-import * as React from "react";
+import React from "react";
 import { BeatLoader } from "react-spinners";
 
 interface FormData {

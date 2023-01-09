@@ -8,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import colors from "pillminder-webclient/src/pages/_common/colors";
 import LoginForm from "pillminder-webclient/src/pages/login/LoginForm";
-import * as React from "react";
+import React from "react";
 
 const Login = () => (
 	<Center h="100%" flexDirection="column" backgroundColor={colors.BACKGROUND}>

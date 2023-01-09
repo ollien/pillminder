@@ -1,6 +1,6 @@
 import Stats from "./Stats";
 import { ChakraProvider } from "@chakra-ui/react";
-import * as React from "react";
+import React from "react";
 import { createRoot } from "react-dom/client";
 
 const getPillminder = (): string | undefined => {

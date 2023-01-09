@@ -11,8 +11,7 @@ import {
 import colors from "pillminder-webclient/src/pages/_common/colors";
 import BigStat from "pillminder-webclient/src/pages/stats/BigStat";
 import LoadingOr from "pillminder-webclient/src/pages/stats/LoadingOr";
-import * as React from "react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 const NO_PILLMINDER_ERROR = "No pillminder selected";
 
