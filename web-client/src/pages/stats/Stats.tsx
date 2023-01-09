@@ -5,7 +5,6 @@ import {
 	Center,
 	Container,
 	Heading,
-	Stack,
 	Text,
 } from "@chakra-ui/react";
 import {
@@ -13,8 +12,8 @@ import {
 	StatsSummary,
 } from "pillminder-webclient/src/lib/api";
 import colors from "pillminder-webclient/src/pages/_common/colors";
-import BigStat from "pillminder-webclient/src/pages/stats/BigStat";
 import LoadingOr from "pillminder-webclient/src/pages/stats/LoadingOr";
+import Summary from "pillminder-webclient/src/pages/stats/Summary";
 import React, { useEffect, useState } from "react";
 
 const NO_PILLMINDER_ERROR = "No pillminder selected";
@@ -37,14 +36,6 @@ const getHeadingMsg = (pillminder: string | undefined) => {
 	} else {
 		return `Stats for ${pillminder}`;
 	}
-};
-
-const formatLastTakenOn = (lastTakenOn: Date | null) => {
-	if (lastTakenOn == null) {
-		return "Never";
-	}
-
-	return lastTakenOn.toLocaleDateString();
 };
 
 const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
@@ -74,13 +65,7 @@ const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 
 	const statsSummaryElement = (
 		<LoadingOr isLoading={statsSummary == null}>
-			<Stack direction="row" justifyContent="space-around" alignItems="">
-				<BigStat value={`${statsSummary?.streakLength}`} name="Streak" />
-				<BigStat
-					value={formatLastTakenOn(statsSummary?.lastTaken)}
-					name="Last taken on"
-				/>
-			</Stack>
+			<Summary statsSummary={statsSummary} />
 		</LoadingOr>
 	);
 
