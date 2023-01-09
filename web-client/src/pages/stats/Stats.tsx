@@ -8,25 +8,16 @@ import {
 	Stack,
 	Text,
 } from "@chakra-ui/react";
+import {
+	getStatsSummary,
+	StatsSummary,
+} from "pillminder-webclient/src/lib/api";
 import colors from "pillminder-webclient/src/pages/_common/colors";
 import BigStat from "pillminder-webclient/src/pages/stats/BigStat";
 import LoadingOr from "pillminder-webclient/src/pages/stats/LoadingOr";
 import React, { useEffect, useState } from "react";
 
 const NO_PILLMINDER_ERROR = "No pillminder selected";
-
-const getStreakLength = async (
-	pillminder: string
-): Promise<{ streak_length: number }> => {
-	const res = await fetch(`/stats/${encodeURIComponent(pillminder)}/summary`);
-
-	if (res.status !== 200) {
-		// This api doesn't return any real errors, so we can just give a generic message
-		throw new Error("Failed to load streak");
-	}
-
-	return res.json();
-};
 
 const getFirstError = (...errors: (string | null)[]): string | null => {
 	return errors.find((error) => error != null) ?? null;
@@ -48,8 +39,16 @@ const getHeadingMsg = (pillminder: string | undefined) => {
 	}
 };
 
+const formatLastTakenOn = (lastTakenOn: Date | null) => {
+	if (lastTakenOn == null) {
+		return "Never";
+	}
+
+	return lastTakenOn.toLocaleDateString();
+};
+
 const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
-	const [streakLength, setStreakLength] = useState<number | null>(null);
+	const [statsSummary, setStatsSummary] = useState<StatsSummary | null>(null);
 	const [storedError, setStoredError] = useState<string | null>(null);
 	const emptyPillminderError = makeEmptyPillminderError(pillminder);
 
@@ -66,20 +65,21 @@ const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 			return;
 		}
 
-		getStreakLength(pillminder)
-			.then(({ streak_length: fetchedLength }) => {
-				setStreakLength(fetchedLength);
-			})
+		getStatsSummary(pillminder)
+			.then(setStatsSummary)
 			.catch((fetchErr: Error) => {
 				setStoredError(fetchErr.message);
 			});
 	}, [pillminder, error]);
 
-	const statsSummary = (
-		<LoadingOr isLoading={streakLength == null}>
+	const statsSummaryElement = (
+		<LoadingOr isLoading={statsSummary == null}>
 			<Stack direction="row" justifyContent="space-around" alignItems="">
-				<BigStat value={`${streakLength}`} name="Streak" />
-				{/* TODO: add other stats here */}
+				<BigStat value={`${statsSummary?.streakLength}`} name="Streak" />
+				<BigStat
+					value={formatLastTakenOn(statsSummary?.lastTaken)}
+					name="Last taken on"
+				/>
 			</Stack>
 		</LoadingOr>
 	);
@@ -100,7 +100,7 @@ const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 						<Heading size="md">{getHeadingMsg(pillminder)}</Heading>
 					</CardHeader>
 					<CardBody width="100%">
-						{error == null ? statsSummary : errorElement}
+						{error == null ? statsSummaryElement : errorElement}
 					</CardBody>
 				</Card>
 			</Container>
