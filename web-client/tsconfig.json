@@ -4,6 +4,7 @@
 		"baseUrl": "./",
 		"paths": {
 			"pillminder-webclient/src/*": ["./src/*"]
-		}
+		},
+        "noEmitOnError": true
 	}
 }

@@ -14,6 +14,8 @@ import LoadingOr from "pillminder-webclient/src/pages/stats/LoadingOr";
 import * as React from "react";
 import { useEffect, useState } from "react";
 
+const NO_PILLMINDER_ERROR = "No pillminder selected";
+
 const getStreakLength = async (
 	pillminder: string
 ): Promise<{ streak_length: number }> => {
@@ -27,19 +29,52 @@ const getStreakLength = async (
 	return res.json();
 };
 
+const getFirstError = (...errors: (string | null)[]): string | null => {
+	return errors.find((error) => error != null) ?? null;
+};
+
+const makeEmptyPillminderError = (pillminder: string | undefined) => {
+	if (pillminder == null) {
+		return NO_PILLMINDER_ERROR;
+	}
+
+	return null;
+};
+
+const getHeadingMsg = (pillminder: string | undefined) => {
+	if (pillminder == null) {
+		return "Stats";
+	} else {
+		return `Stats for ${pillminder}`;
+	}
+};
+
 const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 	const [streakLength, setStreakLength] = useState<number | null>(null);
-	const [error, setError] = useState<string | null>(null);
+	const [storedError, setStoredError] = useState<string | null>(null);
+	const emptyPillminderError = makeEmptyPillminderError(pillminder);
 
+	const error = getFirstError(storedError, emptyPillminderError);
 	useEffect(() => {
+		if (error != null) {
+			return;
+		}
+
+		if (pillminder == null) {
+			// Ideally this should be prevented by getError, but if somehow at broke, we can be defensive here
+			// (doing it here is ineffective since it causes a second render)
+			setStoredError(NO_PILLMINDER_ERROR);
+			return;
+		}
+
 		getStreakLength(pillminder)
 			.then(({ streak_length: fetchedLength }) => {
 				setStreakLength(fetchedLength);
 			})
 			.catch((fetchErr: Error) => {
-				setError(fetchErr.message);
+				setStoredError(fetchErr.message);
 			});
-	}, [pillminder]);
+	}, [pillminder, error]);
 
 	const statsSummary = (
 		<LoadingOr isLoading={streakLength == null}>
@@ -63,7 +98,7 @@ const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 			<Container>
 				<Card backgroundColor="white" shadow="2xl">
 					<CardHeader>
-						<Heading size="md">Stats for {pillminder}</Heading>
+						<Heading size="md">{getHeadingMsg(pillminder)}</Heading>
 					</CardHeader>
 					<CardBody width="100%">
 						{error == null ? statsSummary : errorElement}
