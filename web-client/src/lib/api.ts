@@ -1,9 +1,11 @@
+import { DateTime } from "luxon";
+
 /**
  * A summary of statistics about a user's medication
  */
 export interface StatsSummary {
 	streakLength: number;
-	lastTaken: Date;
+	lastTaken: DateTime;
 }
 
 /**
@@ -30,14 +32,13 @@ export async function getStatsSummary(
 	};
 }
 
-function parseDate(date: string | null): Date | null {
+function parseDate(date: string | null): DateTime | null {
 	if (date == null) {
 		return null;
 	}
 
-	const parsed = new Date(date);
-	// This is how the date API indicates we've been given an invalid date...
-	if (parsed.toString() == "Invalid Date") {
+	const parsed = DateTime.fromISO(date);
+	if (!parsed.isValid) {
 		throw Error(`Invalid date returned from server (${date})`);
 	}
 
