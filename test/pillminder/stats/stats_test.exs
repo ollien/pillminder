@@ -112,29 +112,21 @@ defmodule PillminderTest.Stats do
     test "a streak with no gap gives the length" do
       base_taken_at = ~U[2022-12-10 10:32:00Z]
 
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at
-        )
+      taken_ats = [
+        base_taken_at,
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(1)),
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(2)),
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(3))
+      ]
 
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at |> Timex.subtract(Timex.Duration.from_days(1))
-        )
-
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at |> Timex.subtract(Timex.Duration.from_days(2))
-        )
-
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at |> Timex.subtract(Timex.Duration.from_days(3))
-        )
+      taken_ats
+      |> Enum.each(fn taken_at ->
+        :ok =
+          Stats.record_taken(
+            "test-pillminder",
+            taken_at
+          )
+      end)
 
       {:ok, streak_length} = Stats.streak_length("test-pillminder")
 
@@ -144,29 +136,20 @@ defmodule PillminderTest.Stats do
     test "a gap in the streak produces the number of days after the gap" do
       base_taken_at = ~U[2022-12-10 10:32:00Z]
 
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at
-        )
+      taken_ats = [
+        base_taken_at,
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(1)),
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(3))
+      ]
 
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at |> Timex.subtract(Timex.Duration.from_days(1))
-        )
-
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at |> Timex.subtract(Timex.Duration.from_days(3))
-        )
-
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at |> Timex.subtract(Timex.Duration.from_days(4))
-        )
+      taken_ats
+      |> Enum.each(fn taken_at ->
+        :ok =
+          Stats.record_taken(
+            "test-pillminder",
+            taken_at
+          )
+      end)
 
       {:ok, streak_length} = Stats.streak_length("test-pillminder")
 
@@ -256,23 +239,20 @@ defmodule PillminderTest.Stats do
     test "several entries are reflected in the map" do
       base_taken_at = ~U[2023-01-08 10:50:00Z]
 
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at |> Timex.subtract(Timex.Duration.from_days(1))
-        )
+      taken_ats = [
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(1)),
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(3)),
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(4))
+      ]
 
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at |> Timex.subtract(Timex.Duration.from_days(3))
-        )
-
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at |> Timex.subtract(Timex.Duration.from_days(4))
-        )
+      taken_ats
+      |> Enum.each(fn taken_at ->
+        :ok =
+          Stats.record_taken(
+            "test-pillminder",
+            taken_at
+          )
+      end)
 
       {:ok, log} = Stats.taken_log("test-pillminder", base_taken_at |> DateTime.to_date(), 5)
 
@@ -288,35 +268,22 @@ defmodule PillminderTest.Stats do
     test "entries outside the date range are not reflected in the output" do
       base_taken_at = ~U[2023-01-08 10:50:00Z]
 
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at |> Timex.subtract(Timex.Duration.from_days(1))
-        )
+      taken_ats = [
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(1)),
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(8)),
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(9)),
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(10)),
+        base_taken_at |> Timex.subtract(Timex.Duration.from_days(11))
+      ]
 
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at |> Timex.subtract(Timex.Duration.from_days(8))
-        )
-
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at |> Timex.subtract(Timex.Duration.from_days(9))
-        )
-
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at |> Timex.subtract(Timex.Duration.from_days(10))
-        )
-
-      :ok =
-        Stats.record_taken(
-          "test-pillminder",
-          base_taken_at |> Timex.subtract(Timex.Duration.from_days(11))
-        )
+      taken_ats
+      |> Enum.each(fn taken_at ->
+        :ok =
+          Stats.record_taken(
+            "test-pillminder",
+            taken_at
+          )
+      end)
 
       {:ok, log} = Stats.taken_log("test-pillminder", base_taken_at |> DateTime.to_date(), 3)
 
