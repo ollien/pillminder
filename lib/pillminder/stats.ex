@@ -45,6 +45,30 @@ defmodule Pillminder.Stats do
     end
   end
 
+  @spec taken_log(String.t(), Date.t(), number()) ::
+          {:ok, %{Date.t() => boolean()}} | {:error, any()}
+  def taken_log(timer_id, starting_at, num_days \\ 7) do
+    last_n_entries =
+      TakenLog
+      |> Ecto.Query.where(timer: ^timer_id)
+      |> Ecto.Query.order_by(desc: :taken_at)
+      # The limit is an overcorrection but that's fine - we just need to have the last num_days entries
+      # available to us, even if there are a few extras
+      |> Ecto.Query.limit(^num_days)
+      |> Repo.all()
+
+    last_n_entries
+    |> Enum.map(&logged_date/1)
+    |> Util.Error.all_ok()
+    |> case do
+      {:ok, last_n_taken_dates} ->
+        {:ok, build_taken_log(starting_at, num_days, last_n_taken_dates)}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   @spec streak_length(String.t()) :: {:ok, number()} | {:error, any()}
   def streak_length(timer_id) do
     Repo.transaction(fn ->
@@ -199,7 +223,8 @@ defmodule Pillminder.Stats do
     offset_seconds / 3600
   end
 
-  @spec reattach_timezone(DateTime.t(), float()) :: {:ok, DateTime.t()} | {:error, any()}
+  @spec reattach_timezone(DateTime.t(), float()) ::
+          {:ok, DateTime.t()} | {:error, {:reattach_timezone, any()}}
   defp reattach_timezone(taken_at, offset) do
     # Timex allows us to express fractional timezone offsets as integers multiplied by 100,
     # we can handle our floating point offsets by rounding after a * 100 multiplication
@@ -218,7 +243,32 @@ defmodule Pillminder.Stats do
         {:ok, taken_at}
 
       {:error, err} ->
-        {:error, err}
+        {:error, {:reattach_timezone, err}}
     end
+  end
+
+  @spec logged_date(TakenLog.t()) ::
+          {:ok, Date.t()} | {:error, {:date_extraction_failed, {DateTime.t(), number()}, any()}}
+  defp logged_date(%{taken_at: utc_taken_at, utc_offset: offset}) do
+    case reattach_timezone(utc_taken_at, offset) do
+      {:ok, corrected_datetime} ->
+        {:ok, DateTime.to_date(corrected_datetime)}
+
+      {:error, reason} ->
+        {:error, {:date_extraction_failed, {utc_taken_at, offset}}, reason}
+    end
+  end
+
+  @spec build_taken_log(Date.t(), number(), [Date.t()]) :: %{Date.t() => boolean()}
+  defp build_taken_log(start_date, num_days_to_log, taken_dates) do
+    0..(num_days_to_log - 1)
+    |> Enum.reduce(%{}, fn offset, acc ->
+      date =
+        start_date
+        |> Timex.subtract(Timex.Duration.from_days(offset))
+
+      have_value = Enum.member?(taken_dates, date)
+      Map.put(acc, date, have_value)
+    end)
   end
 end

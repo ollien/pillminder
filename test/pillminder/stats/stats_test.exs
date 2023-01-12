@@ -222,6 +222,112 @@ defmodule PillminderTest.Stats do
     end
   end
 
+  describe "taken log" do
+    test "no entries returns the last n days as a map full of falses" do
+      {:ok, log} = Stats.taken_log("test-pillminder", ~D[2023-01-08], 5)
+
+      assert log == %{
+               ~D[2023-01-08] => false,
+               ~D[2023-01-07] => false,
+               ~D[2023-01-06] => false,
+               ~D[2023-01-05] => false,
+               ~D[2023-01-04] => false
+             }
+    end
+
+    test "one entry yesterday is reflected in the map" do
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          ~U[2023-01-07 10:50:00Z]
+        )
+
+      {:ok, log} = Stats.taken_log("test-pillminder", ~D[2023-01-08], 5)
+
+      assert log == %{
+               ~D[2023-01-08] => false,
+               ~D[2023-01-07] => true,
+               ~D[2023-01-06] => false,
+               ~D[2023-01-05] => false,
+               ~D[2023-01-04] => false
+             }
+    end
+
+    test "several entries are reflected in the map" do
+      base_taken_at = ~U[2023-01-08 10:50:00Z]
+
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(1))
+        )
+
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(3))
+        )
+
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(4))
+        )
+
+      {:ok, log} = Stats.taken_log("test-pillminder", base_taken_at |> DateTime.to_date(), 5)
+
+      assert log == %{
+               ~D[2023-01-08] => false,
+               ~D[2023-01-07] => true,
+               ~D[2023-01-06] => false,
+               ~D[2023-01-05] => true,
+               ~D[2023-01-04] => true
+             }
+    end
+
+    test "entries outside the date range are not reflected in the output" do
+      base_taken_at = ~U[2023-01-08 10:50:00Z]
+
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(1))
+        )
+
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(8))
+        )
+
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(9))
+        )
+
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(10))
+        )
+
+      :ok =
+        Stats.record_taken(
+          "test-pillminder",
+          base_taken_at |> Timex.subtract(Timex.Duration.from_days(11))
+        )
+
+      {:ok, log} = Stats.taken_log("test-pillminder", base_taken_at |> DateTime.to_date(), 3)
+
+      assert log == %{
+               ~D[2023-01-08] => false,
+               ~D[2023-01-07] => true,
+               ~D[2023-01-06] => false
+             }
+    end
+  end
+
   defp configure_tmpfile_repo(repo) do
     {:ok, _} = Application.ensure_all_started(:briefly)
 

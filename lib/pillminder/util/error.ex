@@ -36,4 +36,29 @@ defmodule Pillminder.Util.Error do
   def or_error(err = {:error, _reason}) do
     err
   end
+
+  @doc """
+  The inverse of ok_or
+
+  ## Examples
+      iex> Pillminder.Util.Error.all_ok([{:ok, 23}, {:ok, 54}, {:ok, 12}])
+      {:ok, [23, 54, 12]}
+
+      iex> Pillminder.Util.Error.all_ok([{:ok, 23}, {:error, :failed}])
+      {:error, :failed}
+  """
+  @spec all_ok([{:ok, value} | {:error, err}]) :: {:ok, [value]} | {:error, err}
+        when value: any, err: any
+  def all_ok(items) do
+    items
+    |> Enum.reverse()
+    |> Enum.reduce_while([], fn
+      {:ok, value}, acc -> {:cont, [value | acc]}
+      {:error, reason}, _acc -> {:halt, {:error, reason}}
+    end)
+    |> case do
+      err = {:error, _reason} -> err
+      unpacked -> {:ok, unpacked}
+    end
+  end
 end
