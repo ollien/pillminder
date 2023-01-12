@@ -46,6 +46,32 @@ defmodule Pillminder.WebRouter.Stats do
     end
   end
 
+  get "/:timer_id/log" do
+    with {:get_time, {:ok, now}} <- {:get_time, Timex.local() |> Util.Error.ok_or()},
+         today = DateTime.to_date(now),
+         {:get_log, {:ok, taken_log}} <-
+           {:get_log, Stats.taken_log(timer_id, today)} do
+      iso_taken_log =
+        taken_log
+        |> Enum.map(fn {date, taken} -> {Date.to_iso8601(date), taken} end)
+        |> Enum.into(%{})
+
+      send_resp(
+        conn,
+        200,
+        %{taken_dates: iso_taken_log} |> Poison.encode!()
+      )
+    else
+      {:get_time, {:error, reason}} ->
+        Logger.error("Failed to get current time: #{inspect(reason)}")
+        send_resp(conn, 500, "")
+
+      {:get_log, {:error, reason}} ->
+        Logger.error("Failed generate taken log for #{timer_id}: #{inspect(reason)}")
+        send_resp(conn, 500, "")
+    end
+  end
+
   match _ do
     send_resp(conn, 404, "")
   end
