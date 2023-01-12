@@ -229,10 +229,8 @@ defmodule Pillminder.Stats do
   defp in_utc(datetime) do
     utc_tz = Timex.Timezone.get("Etc/UTC", datetime)
 
-    case Timex.Timezone.convert(datetime, utc_tz) do
-      utc_datetime = %DateTime{} -> utc_datetime
-      %Timex.AmbiguousDateTime{after: after_datetime} -> after_datetime
-    end
+    Timex.Timezone.convert(datetime, utc_tz)
+    |> disambiguate_datetime()
   end
 
   # Get the UTC offset of the given datetime for database persistence
@@ -253,21 +251,34 @@ defmodule Pillminder.Stats do
     # we can handle our floating point offsets by rounding after a * 100 multiplication
     integer_offset = round(offset * 100)
 
-    with {:ok, tz_name} <- Timex.Timezone.name_of(integer_offset) |> Util.Error.ok_or(),
-         {:ok, tz} <- Timex.Timezone.get(tz_name) |> Util.Error.ok_or() do
-      converted = Timex.Timezone.convert(taken_at, tz)
-      {:ok, converted}
+    with {:find_tz, {:ok, tz_name}} <-
+           {:find_tz, Timex.Timezone.name_of(integer_offset) |> Util.Error.ok_or()},
+         {:get_tz, {:ok, tz}} <-
+           {:get_tz, Timex.Timezone.get(tz_name) |> Util.Error.ok_or()},
+         {:conversion, {:ok, converted}} <-
+           {:conversion, Timex.Timezone.convert(taken_at, tz) |> Util.Error.ok_or()} do
+      {:ok, disambiguate_datetime(converted)}
     else
-      {:error, :unknown_timezone} ->
+      {:find_tz, {:error, :time_zone_not_found}} ->
         Logger.warning(
           "Failed to load time #{inspect(taken_at)} with offset #{offset}: offset produced no timezone. Representing as UTC"
         )
 
         {:ok, taken_at}
 
-      {:error, err} ->
-        {:error, {:reattach_timezone, err}}
+      {stage, {:error, err}} ->
+        {:error, {stage, {:reattach_timezone, err}}}
     end
+  end
+
+  defp disambiguate_datetime(datetime = %DateTime{}) do
+    datetime
+  end
+
+  # The Timex docs say that unless we have a good reason, we should use "after". In the cases in this module,
+  # there is no such reason
+  defp disambiguate_datetime(%Timex.AmbiguousDateTime{after: after_datetime}) do
+    after_datetime
   end
 
   @spec logged_date(TakenLog.t()) ::
