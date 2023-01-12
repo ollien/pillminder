@@ -6,6 +6,11 @@ defmodule Pillminder.Stats do
   alias Pillminder.Stats.Repo
   alias Pillminder.Stats.TakenLog
 
+  @doc """
+    Record medication as taken at the given datetime for the given timer id.
+
+    Returns an error if the taken_at indicates that medication was taken twice in the same day.
+  """
   @spec record_taken(String.t(), DateTime.t()) ::
           :ok | {:error, :already_taken_today | any()}
   def record_taken(timer_id, taken_at) do
@@ -27,6 +32,10 @@ defmodule Pillminder.Stats do
     end
   end
 
+  @doc """
+    Get the last time that medication was taken for the given timer id, if any. If it hasn't been taken at all,
+    nil is returned.
+  """
   @spec last_taken_at(String.t()) :: {:ok, DateTime.t() | nil} | {:error, any()}
   def last_taken_at(timer_id) do
     last_entry =
@@ -45,6 +54,10 @@ defmodule Pillminder.Stats do
     end
   end
 
+  @doc """
+    Get the last time that medication was taken for the given timer id, if any. If it hasn't been taken at all,
+    nil is returned.
+  """
   @spec taken_log(String.t(), Date.t(), number()) ::
           {:ok, %{Date.t() => boolean()}} | {:error, any()}
   def taken_log(timer_id, starting_at, num_days \\ 7) do
@@ -69,6 +82,9 @@ defmodule Pillminder.Stats do
     end
   end
 
+  @doc """
+    Get the number of days in a row that medication has been given for the latest timer.
+  """
   @spec streak_length(String.t()) :: {:ok, number()} | {:error, any()}
   def streak_length(timer_id) do
     Repo.transaction(fn ->
@@ -80,6 +96,13 @@ defmodule Pillminder.Stats do
     end
   end
 
+  @doc """
+    Get the number of days in a row that medication has been given for the latest timer.
+
+    The provided date is used as a cut-off of sorts. If the medication was taken the day prior to the given date,
+    the streak is not yet broken (as the user still has a chance to complete their streak for the given date). However,
+    if it has been two days, the streak resets to zero.
+  """
   @spec streak_length(String.t(), Date.t()) :: {:ok, number()} | {:error, any()}
   def streak_length(timer_id, today) do
     Repo.transaction(fn ->
