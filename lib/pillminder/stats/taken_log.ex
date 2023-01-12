@@ -1,6 +1,12 @@
 defmodule Pillminder.Stats.TakenLog do
   use Ecto.Schema
 
+  @type t :: %__MODULE__{
+          timer: string(),
+          taken_at: DateTime.t(),
+          utc_offset: float()
+        }
+
   schema "taken_log" do
     field(:timer, :string)
     field(:taken_at, :utc_datetime)

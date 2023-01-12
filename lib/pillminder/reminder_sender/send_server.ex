@@ -37,8 +37,8 @@ defmodule Pillminder.ReminderSender.SendServer do
   """
 
   @spec start_link(
-          {remind_func, Supervisor.t(), send_server_opts}
-          | {remind_func, Supervisor.t(), send_server_opts}
+          {remind_func, Supervisor.supervisor(), send_server_opts}
+          | {remind_func, Supervisor.supervisor(), send_server_opts}
         ) ::
           {:ok, pid} | {:error, any} | :ignore
   def start_link({remind_func, task_supervisor}) when not is_list(task_supervisor) do

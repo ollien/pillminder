@@ -267,10 +267,11 @@ defmodule Pillminder.Stats do
         {:ok, taken_at}
 
       {stage, {:error, err}} ->
-        {:error, {stage, {:reattach_timezone, err}}}
+        {:error, {:reattach_timezone, {stage, err}}}
     end
   end
 
+  @spec disambiguate_datetime(DateTime.t() | Timex.AmbiguousDateTime.t()) :: DateTime.t()
   defp disambiguate_datetime(datetime = %DateTime{}) do
     datetime
   end
