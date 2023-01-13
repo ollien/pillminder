@@ -2,7 +2,7 @@ defmodule Pillminder.Stats.TakenLog do
   use Ecto.Schema
 
   @type t :: %__MODULE__{
-          timer: string(),
+          timer: String.t(),
           taken_at: DateTime.t(),
           utc_offset: float()
         }
