@@ -58,9 +58,9 @@ defmodule Pillminder.Stats do
     Get the last time that medication was taken for the given timer id, if any. If it hasn't been taken at all,
     nil is returned.
   """
-  @spec taken_log(String.t(), Date.t(), number()) ::
+  @spec taken_dates(String.t(), Date.t(), number()) ::
           {:ok, %{Date.t() => boolean()}} | {:error, any()}
-  def taken_log(timer_id, starting_at, num_days \\ 7) do
+  def taken_dates(timer_id, starting_at, num_days \\ 7) do
     last_n_entries =
       TakenLog
       |> Ecto.Query.where(timer: ^timer_id)
@@ -75,7 +75,7 @@ defmodule Pillminder.Stats do
     |> Util.Error.all_ok()
     |> case do
       {:ok, last_n_taken_dates} ->
-        {:ok, build_taken_log(starting_at, num_days, last_n_taken_dates)}
+        {:ok, build_taken_dates(starting_at, num_days, last_n_taken_dates)}
 
       {:error, reason} ->
         {:error, reason}
@@ -294,8 +294,8 @@ defmodule Pillminder.Stats do
     end
   end
 
-  @spec build_taken_log(Date.t(), number(), [Date.t()]) :: %{Date.t() => boolean()}
-  defp build_taken_log(start_date, num_days_to_log, taken_dates) do
+  @spec build_taken_dates(Date.t(), number(), [Date.t()]) :: %{Date.t() => boolean()}
+  defp build_taken_dates(start_date, num_days_to_log, taken_dates) do
     0..(num_days_to_log - 1)
     |> Enum.reduce(%{}, fn offset, acc ->
       date =

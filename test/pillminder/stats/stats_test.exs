@@ -205,9 +205,9 @@ defmodule PillminderTest.Stats do
     end
   end
 
-  describe "taken log" do
+  describe "taken dates" do
     test "no entries returns the last n days as a map full of falses" do
-      {:ok, log} = Stats.taken_log("test-pillminder", ~D[2023-01-08], 5)
+      {:ok, log} = Stats.taken_dates("test-pillminder", ~D[2023-01-08], 5)
 
       assert log == %{
                ~D[2023-01-08] => false,
@@ -225,7 +225,7 @@ defmodule PillminderTest.Stats do
           ~U[2023-01-07 10:50:00Z]
         )
 
-      {:ok, log} = Stats.taken_log("test-pillminder", ~D[2023-01-08], 5)
+      {:ok, log} = Stats.taken_dates("test-pillminder", ~D[2023-01-08], 5)
 
       assert log == %{
                ~D[2023-01-08] => false,
@@ -254,7 +254,7 @@ defmodule PillminderTest.Stats do
           )
       end)
 
-      {:ok, log} = Stats.taken_log("test-pillminder", base_taken_at |> DateTime.to_date(), 5)
+      {:ok, log} = Stats.taken_dates("test-pillminder", base_taken_at |> DateTime.to_date(), 5)
 
       assert log == %{
                ~D[2023-01-08] => false,
@@ -285,7 +285,7 @@ defmodule PillminderTest.Stats do
           )
       end)
 
-      {:ok, log} = Stats.taken_log("test-pillminder", base_taken_at |> DateTime.to_date(), 3)
+      {:ok, log} = Stats.taken_dates("test-pillminder", base_taken_at |> DateTime.to_date(), 3)
 
       assert log == %{
                ~D[2023-01-08] => false,

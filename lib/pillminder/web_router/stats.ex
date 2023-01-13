@@ -49,10 +49,10 @@ defmodule Pillminder.WebRouter.Stats do
   get "/:timer_id/log" do
     with {:get_time, {:ok, now}} <- {:get_time, Timex.local() |> Util.Error.ok_or()},
          today = DateTime.to_date(now),
-         {:get_log, {:ok, taken_log}} <-
-           {:get_log, Stats.taken_log(timer_id, today)} do
+         {:get_log, {:ok, taken_dates}} <-
+           {:get_log, Stats.taken_dates(timer_id, today)} do
       iso_taken_log =
-        taken_log
+        taken_dates
         |> Enum.map(fn {date, taken} -> {Date.to_iso8601(date), taken} end)
         |> Enum.into(%{})
 
