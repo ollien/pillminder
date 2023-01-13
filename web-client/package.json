@@ -30,6 +30,7 @@
 		"eslint": "^8.31.0",
 		"eslint-config-prettier": "^8.6.0",
 		"eslint-plugin-react": "^7.31.11",
+		"eslint-plugin-react-hooks": "^4.6.0",
 		"eslint-plugin-unused-imports": "^2.0.0",
 		"fork-ts-checker-webpack-plugin": "^7.2.14",
 		"html-webpack-plugin": "^5.5.0",
