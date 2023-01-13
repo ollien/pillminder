@@ -46,7 +46,7 @@ defmodule Pillminder.WebRouter.Stats do
     end
   end
 
-  get "/:timer_id/log" do
+  get "/:timer_id/history" do
     with {:get_time, {:ok, now}} <- {:get_time, Timex.local() |> Util.Error.ok_or()},
          today = DateTime.to_date(now),
          {:get_log, {:ok, taken_dates}} <-
