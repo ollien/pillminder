@@ -5,7 +5,7 @@ import { DateTime } from "luxon";
  */
 export interface StatsSummary {
 	streakLength: number;
-	lastTaken: DateTime;
+	lastTaken: DateTime | null;
 }
 
 /**
