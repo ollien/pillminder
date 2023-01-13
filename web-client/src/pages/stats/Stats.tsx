@@ -1,17 +1,9 @@
-import {
-	Card,
-	CardBody,
-	CardHeader,
-	Center,
-	Container,
-	Heading,
-	Text,
-} from "@chakra-ui/react";
+import { CardBody, CardHeader, Center, Heading, Text } from "@chakra-ui/react";
 import {
 	getStatsSummary,
 	StatsSummary,
 } from "pillminder-webclient/src/lib/api";
-import colors from "pillminder-webclient/src/pages/_common/colors";
+import CardPage from "pillminder-webclient/src/pages/_common/CardPage";
 import LoadingOr from "pillminder-webclient/src/pages/stats/LoadingOr";
 import Summary from "pillminder-webclient/src/pages/stats/Summary";
 import React, { useEffect, useState } from "react";
@@ -78,20 +70,16 @@ const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 	);
 
 	return (
-		<Center h="100%" flexDirection="column" backgroundColor={colors.BACKGROUND}>
-			<Container maxW="container.md">
-				<Card backgroundColor="white" shadow="2xl">
-					<CardHeader>
-						<Heading size={{ base: "lg", lg: "md" }}>
-							{getHeadingMsg(pillminder)}
-						</Heading>
-					</CardHeader>
-					<CardBody width="100%">
-						{error == null ? statsSummaryElement : errorElement}
-					</CardBody>
-				</Card>
-			</Container>
-		</Center>
+		<CardPage maxWidth="container.md">
+			<CardHeader>
+				<Heading size={{ base: "lg", lg: "md" }}>
+					{getHeadingMsg(pillminder)}
+				</Heading>
+			</CardHeader>
+			<CardBody width="100%">
+				{error == null ? statsSummaryElement : errorElement}
+			</CardBody>
+		</CardPage>
 	);
 };
 

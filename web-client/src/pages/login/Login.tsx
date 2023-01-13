@@ -1,28 +1,17 @@
-import {
-	Card,
-	CardBody,
-	CardHeader,
-	Center,
-	Container,
-	Heading,
-} from "@chakra-ui/react";
-import colors from "pillminder-webclient/src/pages/_common/colors";
+import { CardBody, CardHeader, Heading } from "@chakra-ui/react";
+import CardPage from "pillminder-webclient/src/pages/_common/CardPage";
 import LoginForm from "pillminder-webclient/src/pages/login/LoginForm";
 import React from "react";
 
 const Login = () => (
-	<Center h="100%" flexDirection="column" backgroundColor={colors.BACKGROUND}>
-		<Container>
-			<Card backgroundColor="white" shadow="2xl">
-				<CardHeader>
-					<Heading size="md">Welcome to Pillminder</Heading>
-				</CardHeader>
-				<CardBody>
-					<LoginForm></LoginForm>
-				</CardBody>
-			</Card>
-		</Container>
-	</Center>
+	<CardPage>
+		<CardHeader>
+			<Heading size="md">Welcome to Pillminder</Heading>
+		</CardHeader>
+		<CardBody>
+			<LoginForm></LoginForm>
+		</CardBody>
+	</CardPage>
 );
 
 export default Login;
