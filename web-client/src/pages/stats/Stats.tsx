@@ -57,7 +57,7 @@ const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 
 	const statsSummaryElement = (
 		<LoadingOr isLoading={statsSummary == null}>
-			<Summary statsSummary={statsSummary} />
+			<Summary statsSummary={statsSummary!} />
 		</LoadingOr>
 	);
 

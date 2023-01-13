@@ -3,6 +3,7 @@
 		"jsx": "react",
 		"esModuleInterop": true,
 		"baseUrl": "./",
+		"strict": true,
 		"paths": {
 			"pillminder-webclient/src/*": ["./src/*"]
 		},
