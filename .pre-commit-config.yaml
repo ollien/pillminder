@@ -16,4 +16,4 @@ repos:
         name: npm run format
         language: system
         files: web-client/.*
-        entry: bash -c "cd web-client && npm run lint"
+        entry: bash -c "cd web-client && npm run format"
