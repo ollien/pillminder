@@ -22,7 +22,7 @@ const Loadable = ({
 	} else if (error) {
 		return (
 			<Center>
-				<ErrorText text={error} />;
+				<ErrorText text={error} />
 			</Center>
 		);
 	} else {

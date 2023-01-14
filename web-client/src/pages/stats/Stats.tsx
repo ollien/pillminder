@@ -19,6 +19,16 @@ import React, { useCallback, useEffect, useState } from "react";
 
 const NO_PILLMINDER_ERROR = "No pillminder selected";
 
+const makeErrorString = (err: Error | unknown): string => {
+	if (err instanceof Error && err.cause != null) {
+		return `${err.message}: ${makeErrorString(err.cause)}`;
+	} else if (err instanceof Error) {
+		return err.message;
+	} else {
+		return `${err}`;
+	}
+};
+
 const makeEmptyPillminderError = (pillminder: string | undefined) => {
 	if (pillminder == null) {
 		return NO_PILLMINDER_ERROR;
@@ -48,8 +58,9 @@ const useAPI = <T,>(
 	useEffect(() => {
 		fetchCallback()
 			.then(setData)
-			.catch((error: Error) => {
-				setError(error.message);
+			.catch((err) => {
+				const msg = makeErrorString(err);
+				setError(msg);
 			});
 	}, [fetchCallback]);
 
@@ -62,7 +73,13 @@ const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 			throw Error(NO_PILLMINDER_ERROR);
 		}
 
-		return getStatsSummary(pillminder);
+		try {
+			return getStatsSummary(pillminder);
+		} catch (err) {
+			throw new Error("Failed to fetch summary", {
+				cause: makeErrorString(err),
+			});
+		}
 	}, [pillminder]);
 
 	const [takenDates, takenDatesError] = useAPI(async () => {
@@ -70,7 +87,13 @@ const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 			throw Error(NO_PILLMINDER_ERROR);
 		}
 
-		return getTakenDates(pillminder);
+		try {
+			return getTakenDates(pillminder);
+		} catch (err) {
+			throw new Error("Failed to fetch taken dates", {
+				cause: makeErrorString(err),
+			});
+		}
 	}, [pillminder]);
 
 	const statsBody = (
