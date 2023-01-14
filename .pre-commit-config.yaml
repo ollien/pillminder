@@ -3,3 +3,17 @@ repos:
     rev: v1.0.0
     hooks:
       - id: mix-format
+  - repo: local
+    hooks:
+      - id: npm-lint
+        name: npm run lint
+        language: system
+        files: web-client/.*
+        entry: bash -c "cd web-client && npm run lint"
+  - repo: local
+    hooks:
+      - id: npm-format
+        name: npm run format
+        language: system
+        files: web-client/.*
+        entry: bash -c "cd web-client && npm run format"

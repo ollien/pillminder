@@ -4,6 +4,16 @@ defmodule Pillminder.WebRouter do
   use Plug.Router
 
   plug(Plug.Logger, log: :info)
+
+  if Mix.env() == :dev do
+    plug(Plug.Static,
+      at: "/app",
+      # Technically this should be part of the OTP release, but this is a development server so I don't
+      # _really_ care.
+      from: "./web-client/dist/"
+    )
+  end
+
   plug(:match)
   plug(:dispatch)
 

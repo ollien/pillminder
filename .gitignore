@@ -1,30 +1,36 @@
-# The directory Mix will write compiled artifacts to.
+# Web Server
+
+## The directory Mix will write compiled artifacts to.
 /_build/
 
-# If you run "mix test --cover", coverage assets end up here.
+## If you run "mix test --cover", coverage assets end up here.
 /cover/
 
-# The directory Mix downloads your dependencies sources to.
+## The directory Mix downloads your dependencies sources to.
 /deps/
 
-# Where third-party dependencies like ExDoc output generated docs.
+## Where third-party dependencies like ExDoc output generated docs.
 /doc/
 
-# Ignore .fetch files in case you like to edit your project deps locally.
+## Ignore .fetch files in case you like to edit your project deps locally.
 /.fetch
 
-# If the VM crashes, it generates a dump, let's ignore it too.
+## If the VM crashes, it generates a dump, let's ignore it too.
 erl_crash.dump
 
-# Also ignore archive artifacts (built via "mix archive.build").
+## Also ignore archive artifacts (built via "mix archive.build").
 *.ez
 
-# Ignore package tarball (built via "mix hex.build").
+## Ignore package tarball (built via "mix hex.build").
 pillminder-*.tar
 
-# Temporary files, for example, from tests.
+## Temporary files, for example, from tests.
 /tmp/
 
 /.vscode
-
 /pillminder.db
+
+# Web Client
+
+/web-client/node_modules
+/web-client/dist

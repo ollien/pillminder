@@ -1,0 +1,13 @@
+{
+	"compilerOptions": {
+		"jsx": "react",
+		"lib": ["dom", "ES2022"],
+		"esModuleInterop": true,
+		"baseUrl": "./",
+		"strict": true,
+		"paths": {
+			"pillminder-webclient/src/*": ["./src/*"]
+		},
+		"noEmitOnError": true
+	}
+}
