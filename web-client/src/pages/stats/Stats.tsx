@@ -45,30 +45,24 @@ const getHeadingMsg = (pillminder: string | undefined) => {
 	}
 };
 
-const useAPI = <T,>(
-	doFetch: () => Promise<T>,
-	dependencies: React.DependencyList
-): [T?, string?] => {
+const useAPI = <T,>(doFetch: () => Promise<T>): [T?, string?] => {
 	const [data, setData] = useState<T | undefined>(undefined);
 	const [error, setError] = useState<string | undefined>(undefined);
-	// I think this is correct as-is. `dependencies` corresponds with the fetch callback as-is.
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	const fetchCallback = useCallback(doFetch, dependencies);
 
 	useEffect(() => {
-		fetchCallback()
+		doFetch()
 			.then(setData)
 			.catch((err) => {
 				const msg = makeErrorString(err);
 				setError(msg);
 			});
-	}, [fetchCallback]);
+	}, [doFetch]);
 
 	return [data, error];
 };
 
 const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
-	const [statsSummary, statsSummaryError] = useAPI(async () => {
+	const summaryCallback = useCallback(async () => {
 		if (pillminder == null) {
 			throw Error(NO_PILLMINDER_ERROR);
 		}
@@ -81,8 +75,9 @@ const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 			});
 		}
 	}, [pillminder]);
+	const [statsSummary, statsSummaryError] = useAPI(summaryCallback);
 
-	const [takenDates, takenDatesError] = useAPI(async () => {
+	const takenDatesCallback = useCallback(async () => {
 		if (pillminder == null) {
 			throw Error(NO_PILLMINDER_ERROR);
 		}
@@ -95,6 +90,7 @@ const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 			});
 		}
 	}, [pillminder]);
+	const [takenDates, takenDatesError] = useAPI(takenDatesCallback);
 
 	const statsBody = (
 		<Stack spacing={4}>
