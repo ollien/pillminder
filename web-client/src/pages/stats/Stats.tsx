@@ -1,4 +1,3 @@
-import History from "./History";
 import {
 	CardBody,
 	CardHeader,
@@ -13,17 +12,12 @@ import {
 	getTakenDates,
 } from "pillminder-webclient/src/lib/api";
 import CardPage from "pillminder-webclient/src/pages/_common/CardPage";
-import LoadingOr from "pillminder-webclient/src/pages/stats/LoadingOr";
+import History from "pillminder-webclient/src/pages/stats/History";
+import Loadable from "pillminder-webclient/src/pages/stats/Loadable";
 import Summary from "pillminder-webclient/src/pages/stats/Summary";
 import React, { useCallback, useEffect, useState } from "react";
 
 const NO_PILLMINDER_ERROR = "No pillminder selected";
-
-const getFirstError = (
-	...errors: (string | undefined | null)[]
-): string | null => {
-	return errors.find((error) => error != null) ?? null;
-};
 
 const makeEmptyPillminderError = (pillminder: string | undefined) => {
 	if (pillminder == null) {
@@ -79,34 +73,32 @@ const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 		return getTakenDates(pillminder);
 	}, [pillminder]);
 
-	const emptyPillminderError = makeEmptyPillminderError(pillminder);
-
-	// TODO: Maybe we should have some way to isolate errors to individual components
-	const error = getFirstError(
-		statsSummaryError,
-		takenDatesError,
-		emptyPillminderError
-	);
-
 	const statsBody = (
 		<Stack spacing={4}>
-			<LoadingOr isLoading={statsSummary == null}>
+			<Loadable
+				isLoading={statsSummary == null && statsSummaryError == null}
+				error={statsSummaryError}
+			>
 				<Summary statsSummary={statsSummary!} />
-			</LoadingOr>
+			</Loadable>
 			<Divider />
-			<LoadingOr isLoading={takenDates == null}>
+			<Loadable
+				isLoading={takenDates == null && takenDatesError == null}
+				error={takenDatesError}
+			>
 				<History takenDates={takenDates!} />
-			</LoadingOr>
+			</Loadable>
 		</Stack>
 	);
 
-	const errorElement = (
+	const emptyPillminderError = makeEmptyPillminderError(pillminder);
+	const makeEmptyPillminderErrorElement = emptyPillminderError ? (
 		<Center>
 			<Text color="red.400" fontSize="lg" fontWeight="bold">
-				{error}
+				{emptyPillminderError}
 			</Text>
 		</Center>
-	);
+	) : null;
 
 	return (
 		<CardPage maxWidth="container.md">
@@ -116,7 +108,7 @@ const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 				</Heading>
 			</CardHeader>
 			<CardBody width="100%">
-				{error == null ? statsBody : errorElement}
+				{makeEmptyPillminderErrorElement ?? statsBody}
 			</CardBody>
 		</CardPage>
 	);
