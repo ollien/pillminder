@@ -1,16 +1,27 @@
-import { CardBody, CardHeader, Center, Heading, Text } from "@chakra-ui/react";
+import History from "./History";
+import {
+	CardBody,
+	CardHeader,
+	Center,
+	Divider,
+	Heading,
+	Stack,
+	Text,
+} from "@chakra-ui/react";
 import {
 	getStatsSummary,
-	StatsSummary,
+	getTakenDates,
 } from "pillminder-webclient/src/lib/api";
 import CardPage from "pillminder-webclient/src/pages/_common/CardPage";
 import LoadingOr from "pillminder-webclient/src/pages/stats/LoadingOr";
 import Summary from "pillminder-webclient/src/pages/stats/Summary";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 const NO_PILLMINDER_ERROR = "No pillminder selected";
 
-const getFirstError = (...errors: (string | null)[]): string | null => {
+const getFirstError = (
+	...errors: (string | undefined | null)[]
+): string | null => {
 	return errors.find((error) => error != null) ?? null;
 };
 
@@ -30,35 +41,63 @@ const getHeadingMsg = (pillminder: string | undefined) => {
 	}
 };
 
+const useAPI = <T,>(
+	doFetch: () => Promise<T>,
+	dependencies: React.DependencyList
+): [T?, string?] => {
+	const [data, setData] = useState<T | undefined>(undefined);
+	const [error, setError] = useState<string | undefined>(undefined);
+	// I think this is correct as-is. `dependencies` corresponds with the fetch callback as-is.
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	const fetchCallback = useCallback(doFetch, dependencies);
+
+	useEffect(() => {
+		fetchCallback()
+			.then(setData)
+			.catch((error: Error) => {
+				setError(error.message);
+			});
+	}, [fetchCallback]);
+
+	return [data, error];
+};
+
 const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
-	const [statsSummary, setStatsSummary] = useState<StatsSummary | null>(null);
-	const [storedError, setStoredError] = useState<string | null>(null);
+	const [statsSummary, statsSummaryError] = useAPI(async () => {
+		if (pillminder == null) {
+			throw Error(NO_PILLMINDER_ERROR);
+		}
+
+		return getStatsSummary(pillminder);
+	}, [pillminder]);
+
+	const [takenDates, takenDatesError] = useAPI(async () => {
+		if (pillminder == null) {
+			throw Error(NO_PILLMINDER_ERROR);
+		}
+
+		return getTakenDates(pillminder);
+	}, [pillminder]);
+
 	const emptyPillminderError = makeEmptyPillminderError(pillminder);
 
-	const error = getFirstError(storedError, emptyPillminderError);
-	useEffect(() => {
-		if (error != null) {
-			return;
-		}
+	// TODO: Maybe we should have some way to isolate errors to individual components
+	const error = getFirstError(
+		statsSummaryError,
+		takenDatesError,
+		emptyPillminderError
+	);
 
-		if (pillminder == null) {
-			// Ideally this should be prevented by getError, but if somehow at broke, we can be defensive here
-			// (doing it here is ineffective since it causes a second render)
-			setStoredError(NO_PILLMINDER_ERROR);
-			return;
-		}
-
-		getStatsSummary(pillminder)
-			.then(setStatsSummary)
-			.catch((fetchErr: Error) => {
-				setStoredError(fetchErr.message);
-			});
-	}, [pillminder, error]);
-
-	const statsSummaryElement = (
-		<LoadingOr isLoading={statsSummary == null}>
-			<Summary statsSummary={statsSummary!} />
-		</LoadingOr>
+	const statsBody = (
+		<Stack spacing={4}>
+			<LoadingOr isLoading={statsSummary == null}>
+				<Summary statsSummary={statsSummary!} />
+			</LoadingOr>
+			<Divider />
+			<LoadingOr isLoading={takenDates == null}>
+				<History takenDates={takenDates!} />
+			</LoadingOr>
+		</Stack>
 	);
 
 	const errorElement = (
@@ -77,7 +116,7 @@ const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 				</Heading>
 			</CardHeader>
 			<CardBody width="100%">
-				{error == null ? statsSummaryElement : errorElement}
+				{error == null ? statsBody : errorElement}
 			</CardBody>
 		</CardPage>
 	);
