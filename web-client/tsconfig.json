@@ -8,6 +8,6 @@
 		"paths": {
 			"pillminder-webclient/src/*": ["./src/*"]
 		},
-        "noEmitOnError": true
+		"noEmitOnError": true
 	}
 }
