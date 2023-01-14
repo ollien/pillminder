@@ -5,6 +5,9 @@
 		"./src/*": "./src/*"
 	},
 	"scripts": {
+		"start": "webpack --config webpack.dev.js --watch",
+		"build:prod": "webpack --config webpack.prod.js",
+		"build:dev": "webpack --config webpack.dev.js",
 		"lint": "eslint .",
 		"format": "prettier -w ."
 	},
