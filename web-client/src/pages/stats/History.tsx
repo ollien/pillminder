@@ -1,6 +1,8 @@
-import { CheckIcon, CloseIcon } from "@chakra-ui/icons";
-import { Center, HStack, Tag, TagLeftIcon, TagLabel } from "@chakra-ui/react";
+import { Center, HStack } from "@chakra-ui/react";
 import { TakenDate } from "pillminder-webclient/src/lib/api";
+import HistoryChip, {
+	Status as HistoryStatus,
+} from "pillminder-webclient/src/pages/stats/HistoryChip";
 import React from "react";
 
 interface HistoryProps {
@@ -8,21 +10,24 @@ interface HistoryProps {
 }
 
 const History = ({ takenDates }: HistoryProps) => {
-	const listItems = takenDates.map((takenDate) => {
-		const icon = takenDate.taken ? CheckIcon : CloseIcon;
-		const color = takenDate.taken ? "green" : "red";
+	const listItems = takenDates.map((takenDate, idx) => {
 		const dateDisplay = takenDate.date.toLocaleString({ dateStyle: "short" });
+		const status = (() => {
+			if (idx == 0 && !takenDate.taken) {
+				return HistoryStatus.NOT_TAKEN_YET;
+			} else if (!takenDate.taken) {
+				return HistoryStatus.NOT_TAKEN;
+			} else {
+				return HistoryStatus.TAKEN;
+			}
+		})();
 
 		return (
-			<Tag
-				size="lg"
-				colorScheme={color}
-				minWidth="fit-content"
+			<HistoryChip
+				status={status}
+				label={dateDisplay}
 				key={dateDisplay}
-			>
-				<TagLeftIcon boxSize={2} as={icon}></TagLeftIcon>
-				<TagLabel>{dateDisplay}</TagLabel>
-			</Tag>
+			></HistoryChip>
 		);
 	});
 	listItems.reverse();
