@@ -3,7 +3,7 @@ defmodule Pillminder.Auth.TokenAuthenticator do
   TokenAuthenticator generates tokens that can be used to access individual Pillminders.
   """
   alias Pillminder.Util
-  use GenServer
+  use Agent
 
   @type clock_source :: (() -> DateTime.t())
   @type token_data :: fixed_token_data() | dynamic_token_data()
@@ -17,12 +17,14 @@ defmodule Pillminder.Auth.TokenAuthenticator do
   @type token_type :: :single_use | :expiry_based | :fixed
   @type token_authenticator_opts :: [
           fixed_tokens: [String.t()],
-          server_opts: GenServer.options(),
           clock_source: clock_source(),
-          expiry_time: Timex.Duration.t()
+          expiry_time: Timex.Duration.t(),
+          server_opts: GenServer.options()
         ]
 
   defmodule State do
+    alias Pillminder.Auth.TokenAuthenticator
+
     defstruct tokens: %{},
               clock_source: &Util.Time.now!/0,
               expiry_time: Timex.Duration.from_minutes(10)
@@ -47,7 +49,7 @@ defmodule Pillminder.Auth.TokenAuthenticator do
     server_opts = Keyword.get(opts, :server_opts, [])
     full_opts = Keyword.put_new(server_opts, :name, __MODULE__)
 
-    GenServer.start_link(__MODULE__, opts, full_opts)
+    Agent.start_link(fn -> make_initial_state(opts) end, full_opts)
   end
 
   @doc """
@@ -57,7 +59,9 @@ defmodule Pillminder.Auth.TokenAuthenticator do
   """
   @spec token_data(String.t()) :: token_data() | :invalid_token
   def token_data(token) do
-    GenServer.call(__MODULE__, {:get, token})
+    Agent.get_and_update(__MODULE__, fn state ->
+      lookup_and_consume_token(token, state)
+    end)
   end
 
   @doc """
@@ -65,7 +69,9 @@ defmodule Pillminder.Auth.TokenAuthenticator do
   """
   @spec put_token(String.t(), String.t()) :: :ok | {:error, any()}
   def put_token(token, for_pillminder) do
-    GenServer.call(__MODULE__, {:put, token, for_pillminder, :expiry_based})
+    Agent.get_and_update(__MODULE__, fn state ->
+      store_token(token, :expiry_based, for_pillminder, state)
+    end)
   end
 
   @doc """
@@ -73,16 +79,19 @@ defmodule Pillminder.Auth.TokenAuthenticator do
   """
   @spec put_single_use_token(String.t(), String.t()) :: :ok | {:error, any()}
   def put_single_use_token(token, for_pillminder) do
-    GenServer.call(__MODULE__, {:put, token, for_pillminder, :single_use})
+    Agent.get_and_update(__MODULE__, fn state ->
+      store_token(token, :single_use, for_pillminder, state)
+    end)
   end
 
-  @impl true
-  def init(opts) do
+  @spec make_initial_state(token_authenticator_opts()) :: State.t()
+  defp make_initial_state(start_opts) do
     state_opts =
-      opts |> Enum.filter(fn {key, _value} -> key == :clock_source or key == :expiry_time end)
+      start_opts
+      |> Enum.filter(fn {key, _value} -> key == :clock_source or key == :expiry_time end)
 
     fixed_tokens =
-      Keyword.get(opts, :fixed_tokens, [])
+      Keyword.get(start_opts, :fixed_tokens, [])
       |> Enum.map(fn token -> {token, make_fixed_token_data()} end)
       |> Enum.into(%{})
 
@@ -92,37 +101,65 @@ defmodule Pillminder.Auth.TokenAuthenticator do
         state_opts
       )
 
-    {:ok, state}
+    state
   end
 
-  @impl true
-  @spec handle_call({:get, String.t()}, {pid, term}, State.t()) ::
-          {:reply, token_data() | :invalid_token, State.t()}
-  def handle_call(
-        {:get, token},
-        _from,
-        state
-      ) do
-    case get_token_action(token, state.tokens, state.clock_source) do
+  @spec lookup_and_consume_token(String.t(), State.t()) ::
+          {token_data() | :invalid_token, State.t()}
+  defp lookup_and_consume_token(token, state) do
+    case get_token_lookup_action(token, state.tokens, state.clock_source) do
       :accept ->
         token_data = Map.get(state.tokens, token)
-        {:reply, token_data, state}
+        {token_data, state}
 
       :accept_and_delete ->
         {token_data, next_tokens} = Map.pop!(state.tokens, token)
         next_state = %State{state | tokens: next_tokens}
-        {:reply, token_data, next_state}
+        {token_data, next_state}
 
       :reject ->
         # If the token is invalid, we should just remove it if it exists; no sense in keeping it around
         next_tokens = Map.delete(state.tokens, token)
         next_state = %State{state | tokens: next_tokens}
-        {:reply, :invalid_token, next_state}
+        {:invalid_token, next_state}
     end
   end
 
-  @impl true
-  def handle_call({:put, token, for_pillminder, token_type}, _from, state = %State{}) do
+  @spec get_token_lookup_action(String.t(), %{String.t() => token_data()}, clock_source()) ::
+          token_action()
+  defp get_token_lookup_action(token, known_tokens, clock_source) do
+    case Map.get(known_tokens, token) do
+      nil ->
+        :reject
+
+      %{token_type: :fixed} ->
+        :accept
+
+      %{token_type: :single_use} ->
+        :accept_and_delete
+
+      token_data = %{token_type: :expiry_based} ->
+        get_expiry_based_token_lookup_action(token_data, clock_source)
+    end
+  end
+
+  @spec get_expiry_based_token_lookup_action(token_data(), clock_source()) :: token_action()
+  defp get_expiry_based_token_lookup_action(
+         _token_data = %{token_type: :expiry_based, expires_at: expires_at},
+         clock_source
+       ) do
+    now = clock_source.()
+
+    if Timex.before?(now, expires_at) do
+      :accept
+    else
+      :reject
+    end
+  end
+
+  @spec store_token(String.t(), :expiry_based | :single_use, String.t(), State.t()) ::
+          {:ok | {:error, any()}, State.t()}
+  defp store_token(token, token_type, for_pillminder, state) do
     build_token_data_fn =
       case token_type do
         :expiry_based ->
@@ -141,10 +178,10 @@ defmodule Pillminder.Auth.TokenAuthenticator do
         next_tokens = Map.put(state.tokens, token, token_data)
         next_state = %State{state | tokens: next_tokens}
 
-        {:reply, :ok, next_state}
+        {:ok, next_state}
 
       {:error, reason} ->
-        {:reply, {:error, {:expiry_time_calculation, reason}}, state}
+        {{:error, {:expiry_time_calculation, reason}}, state}
     end
   end
 
@@ -175,44 +212,10 @@ defmodule Pillminder.Auth.TokenAuthenticator do
 
   @spec make_single_use_token_data(String.t()) :: token_data()
   defp make_single_use_token_data(for_pillminder) do
-    data = %{
+    %{
       expires_at: :never,
       pillminder: for_pillminder,
       token_type: :single_use
     }
-
-    data
-  end
-
-  @spec get_token_action(String.t(), %{String.t() => token_data()}, clock_source()) ::
-          token_action()
-  defp get_token_action(token, known_tokens, clock_source) do
-    case Map.get(known_tokens, token) do
-      nil ->
-        :reject
-
-      %{token_type: :fixed} ->
-        :accept
-
-      %{token_type: :single_use} ->
-        :accept_and_delete
-
-      token_data = %{token_type: :expiry_based} ->
-        get_expiry_based_token_action(token_data, clock_source)
-    end
-  end
-
-  @spec get_expiry_based_token_action(token_data(), clock_source()) :: token_action()
-  defp get_expiry_based_token_action(
-         _token_data = %{token_type: :expiry_based, expires_at: expires_at},
-         clock_source
-       ) do
-    now = clock_source.()
-
-    if Timex.before?(now, expires_at) do
-      :accept
-    else
-      :reject
-    end
   end
 end
