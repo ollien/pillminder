@@ -57,9 +57,11 @@ defmodule Pillminder.Auth.TokenAuthenticator do
 
   Note: this is not an idempotent function. If this token is single use, this is how its "single-use" will be consumed.
   """
-  @spec token_data(String.t()) :: token_data() | :invalid_token
-  def token_data(token) do
-    Agent.get_and_update(__MODULE__, fn state ->
+  @spec token_data(String.t(), server_name: GenServer.server()) :: token_data() | :invalid_token
+  def token_data(token, opts \\ []) do
+    destination = Keyword.get(opts, :server_name, __MODULE__)
+
+    Agent.get_and_update(destination, fn state ->
       lookup_and_consume_token(token, state)
     end)
   end
@@ -67,9 +69,12 @@ defmodule Pillminder.Auth.TokenAuthenticator do
   @doc """
   Add a token to the cache; it will live as long as expiry_time on the genserver options
   """
-  @spec put_token(String.t(), String.t()) :: :ok | {:error, any()}
-  def put_token(token, for_pillminder) do
-    Agent.get_and_update(__MODULE__, fn state ->
+  @spec put_token(String.t(), String.t(), server_name: GenServer.server()) ::
+          :ok | {:error, any()}
+  def put_token(token, for_pillminder, opts \\ []) do
+    destination = Keyword.get(opts, :server_name, __MODULE__)
+
+    Agent.get_and_update(destination, fn state ->
       store_token(token, :expiry_based, for_pillminder, state)
     end)
   end
@@ -77,9 +82,12 @@ defmodule Pillminder.Auth.TokenAuthenticator do
   @doc """
   Add a token to the cache, but it will only be able to be used once.
   """
-  @spec put_single_use_token(String.t(), String.t()) :: :ok | {:error, any()}
-  def put_single_use_token(token, for_pillminder) do
-    Agent.get_and_update(__MODULE__, fn state ->
+  @spec put_single_use_token(String.t(), String.t(), server_name: GenServer.server()) ::
+          :ok | {:error, any()}
+  def put_single_use_token(token, for_pillminder, opts \\ []) do
+    destination = Keyword.get(opts, :server_name, __MODULE__)
+
+    Agent.get_and_update(destination, fn state ->
       store_token(token, :single_use, for_pillminder, state)
     end)
   end
