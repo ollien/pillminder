@@ -2,8 +2,10 @@ defmodule PillminderTest.Auth do
   alias Pillminder.Auth
   alias Pillminder.Auth.TokenAuthenticator
 
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   doctest Pillminder.Auth
+
+  @session_token_server_name SessionTokenAuthenticator
 
   setup do
     # Start tzdata, as Timex needs it. test.exs disables network calls for this.
@@ -14,24 +16,36 @@ defmodule PillminderTest.Auth do
 
   describe "token_valid_for_pillminder?" do
     setup do
-      start_supervised!(TokenAuthenticator)
+      start_supervised!({TokenAuthenticator, server_opts: [name: @session_token_server_name]})
       :ok
     end
 
     test "allows dynamic tokens for their assigned pillminders" do
-      :ok = TokenAuthenticator.put_single_use_token("1234", "test-pillminder")
+      :ok =
+        TokenAuthenticator.put_single_use_token("1234", "test-pillminder",
+          server_name: @session_token_server_name
+        )
+
       assert Auth.token_valid_for_pillminder?("1234", "test-pillminder")
     end
 
     test "rejects dynamic tokens for their other pillminders" do
-      :ok = TokenAuthenticator.put_single_use_token("1234", "test-pillminder")
+      :ok =
+        TokenAuthenticator.put_single_use_token("1234", "test-pillminder",
+          server_name: @session_token_server_name
+        )
+
       assert not Auth.token_valid_for_pillminder?("1234", "some-other-pillminder")
     end
   end
 
   describe "token_valid_for_pillminder? with fixed token" do
     setup do
-      start_supervised!({TokenAuthenticator, fixed_tokens: ["1234"]})
+      start_supervised!(
+        {TokenAuthenticator,
+         fixed_tokens: ["1234"], server_opts: [name: @session_token_server_name]}
+      )
+
       :ok
     end
 
@@ -50,7 +64,7 @@ defmodule PillminderTest.Auth do
 
   describe "make_token" do
     setup do
-      start_supervised!(TokenAuthenticator)
+      start_supervised!({TokenAuthenticator, server_opts: [name: @session_token_server_name]})
       :ok
     end
 
@@ -73,7 +87,7 @@ defmodule PillminderTest.Auth do
 
   describe "make_single_use_token" do
     setup do
-      start_supervised!(TokenAuthenticator)
+      start_supervised!({TokenAuthenticator, server_opts: [name: @session_token_server_name]})
       :ok
     end
 
