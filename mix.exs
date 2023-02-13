@@ -31,6 +31,7 @@ defmodule Pillminder.MixProject do
       {:gen_retry, "~> 1.4"},
       {:ecto_sql, "~> 3.0"},
       {:ecto_sqlite3, "~> 0.9.1"},
+      {:secure_random, "~> 0.5"},
       {:briefly, "~> 0.3.0", only: [:test]}
     ]
   end

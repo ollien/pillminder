@@ -1,4 +1,17 @@
 defmodule Pillminder.Util.Time do
+  alias Pillminder.Util
+
+  @doc """
+  Get the current local time, or raise an exception if that fails.
+  """
+  @spec now!() :: DateTime.t()
+  def now!() do
+    case Timex.local() |> Util.Error.ok_or() do
+      {:ok, now} -> now
+      {:error, reason} -> raise "Could not get current time: #{reason}"
+    end
+  end
+
   @doc """
     Get the nest time the given time occurs, or the nest best available option if there is ambiguity.
 

@@ -25,7 +25,7 @@ defmodule Pillminder.Scheduler do
   """
   @spec schedule_reminders([ScheduledReminder.t()], pid, init_options()) :: :ok
   def schedule_reminders(reminders, supervisor, opts \\ []) do
-    clock_source = Keyword.get(opts, :clock_source, &now!/0)
+    clock_source = Keyword.get(opts, :clock_source, &Util.Time.now!/0)
     now = clock_source.()
     {:ok, to_schedule} = get_next_scheduleable_times(reminders, now)
 
@@ -33,14 +33,6 @@ defmodule Pillminder.Scheduler do
       {:ok, ms_until} = get_ms_until(now, schedule_time)
       schedule_reminder(supervisor, reminder, ms_until, clock_source)
     end)
-  end
-
-  @spec now!() :: DateTime.t()
-  defp now!() do
-    case Timex.local() |> Util.Error.ok_or() do
-      {:ok, now} -> now
-      err -> raise "Could not get current time #{err}"
-    end
   end
 
   @spec get_next_scheduleable_times(reminders :: [ScheduledReminder.t()], now :: DateTime.t()) ::
