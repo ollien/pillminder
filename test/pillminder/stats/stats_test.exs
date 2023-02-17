@@ -19,8 +19,6 @@ defmodule PillminderTest.Stats do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Stats.Repo)
     Ecto.Adapters.SQL.Sandbox.mode(Stats.Repo, {:shared, self()})
 
-    # Start tzdata, as the test's Timex needs it. test.exs disables network calls for this.
-    {:ok, _} = Application.ensure_all_started(:tzdata)
     :ok
   end
 

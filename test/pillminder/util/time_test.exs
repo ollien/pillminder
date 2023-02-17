@@ -5,12 +5,6 @@ defmodule PillminderTest.Util.Time do
   doctest Pillminder.Util.Time
 
   describe "get_next_occurrence_of_time" do
-    setup do
-      # Start tzdata, as Timex needs it. test.exs disables network calls for this.
-      {:ok, _} = Application.ensure_all_started(:tzdata)
-      :ok
-    end
-
     test "can get next instance of time before its happened" do
       now = Timex.to_datetime({{2022, 1, 1}, {1, 0, 0}}, "America/New_York")
       next_occurrence = Util.Time.get_next_occurrence_of_time(now, ~T[13:37:00])

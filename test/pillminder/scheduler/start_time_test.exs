@@ -5,12 +5,6 @@ defmodule PillminderTest.Scheduler.StartTime do
   doctest Pillminder.Scheduler.StartTime
 
   describe "next_possible_with_fudge" do
-    setup do
-      # Start tzdata, as Timex needs it. test.exs disables network calls for this.
-      {:ok, _} = Application.ensure_all_started(:tzdata)
-      :ok
-    end
-
     test "gets time within random range" do
       now = Timex.to_datetime({{2022, 1, 1}, {1, 0, 0}}, "America/New_York")
 

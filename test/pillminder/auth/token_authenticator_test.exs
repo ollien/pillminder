@@ -7,12 +7,6 @@ defmodule PillminderTest.Auth.TokenAuthenticator do
   # Server must be named so we can run more than one in unit tests
   @server_name TokenAuthenticatorTestServer
 
-  setup do
-    # Start tzdata, as Timex needs it. test.exs disables network calls for this.
-    {:ok, _} = Application.ensure_all_started(:tzdata)
-    :ok
-  end
-
   test "rejects a token when none have been created" do
     start_supervised!({TokenAuthenticator, server_opts: [name: @server_name]})
     assert TokenAuthenticator.token_data("1234", server_name: @server_name) == :invalid_token

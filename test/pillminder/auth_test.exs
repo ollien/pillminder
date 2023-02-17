@@ -8,13 +8,6 @@ defmodule PillminderTest.Auth do
   @access_code_server_name AccessTokenAuthenticator
   @session_token_server_name SessionTokenAuthenticator
 
-  setup do
-    # Start tzdata, as Timex needs it. test.exs disables network calls for this.
-    {:ok, _} = Application.ensure_all_started(:tzdata)
-
-    :ok
-  end
-
   describe "token_valid_for_pillminder?" do
     setup do
       start_supervised!({TokenAuthenticator, server_opts: [name: @session_token_server_name]})
