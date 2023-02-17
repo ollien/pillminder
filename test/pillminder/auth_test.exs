@@ -5,6 +5,7 @@ defmodule PillminderTest.Auth do
   use ExUnit.Case, async: true
   doctest Pillminder.Auth
 
+  @access_code_server_name AccessTokenAuthenticator
   @session_token_server_name SessionTokenAuthenticator
 
   setup do
@@ -85,26 +86,41 @@ defmodule PillminderTest.Auth do
     end
   end
 
-  describe "make_single_use_token" do
+  describe "exchange_access_token" do
     setup do
-      start_supervised!({TokenAuthenticator, server_opts: [name: @session_token_server_name]})
+      start_supervised!({TokenAuthenticator, server_opts: [name: @access_code_server_name]},
+        id: @access_code_server_name
+      )
+
+      start_supervised!({TokenAuthenticator, server_opts: [name: @session_token_server_name]},
+        id: @session_token_server_name
+      )
+
       :ok
     end
 
-    test "generating a token gives access to that pillminder" do
-      {:ok, token} = Auth.make_single_use_token("test-pillminder")
-      assert Auth.token_valid_for_pillminder?(token, "test-pillminder")
+    test "access code can be exchanged for session token on that pillminder" do
+      {:ok, access_code} = Auth.make_access_code("my-pillminder")
+      {:ok, session_token} = Auth.exchange_access_code(access_code)
+
+      assert Auth.token_valid_for_pillminder?(session_token, "my-pillminder")
     end
 
-    test "generating a token does not give access to other pillminder" do
-      {:ok, token} = Auth.make_single_use_token("test-pillminder")
-      assert not Auth.token_valid_for_pillminder?(token, "some-other-pillminder")
+    test "produced session token is not valid for another pillminder" do
+      {:ok, access_code} = Auth.make_access_code("my-pillminder")
+      {:ok, session_token} = Auth.exchange_access_code(access_code)
+
+      assert not Auth.token_valid_for_pillminder?(session_token, "some-other-pillminder")
     end
 
-    test "a single user token does not allow access more than once" do
-      {:ok, token} = Auth.make_single_use_token("test-pillminder")
-      assert Auth.token_valid_for_pillminder?(token, "test-pillminder")
-      assert not Auth.token_valid_for_pillminder?(token, "test-pillminder")
+    test "an invalid access code returns :invalid_access_code" do
+      assert Auth.exchange_access_code("123456") == {:error, :invalid_access_code}
+    end
+
+    test "an access code can only be exchanged once" do
+      {:ok, access_code} = Auth.make_access_code("my-pillminder")
+      {:ok, _session_token} = Auth.exchange_access_code(access_code)
+      assert Auth.exchange_access_code(access_code) == {:error, :invalid_access_code}
     end
   end
 end
