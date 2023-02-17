@@ -10,18 +10,9 @@ defmodule Pillminder.WebRouter.Stats do
   plug(:dispatch)
 
   get "/:timer_id/summary" do
-    with {:get_time, {:ok, now}} <- {:get_time, Timex.local() |> Util.Error.ok_or()},
-         today = DateTime.to_date(now),
-         {:get_streak, {:ok, streak_length}} <-
-           {:get_streak, Stats.streak_length(timer_id, today)},
-         {:get_last_taken, {:ok, last_taken_at}} <-
-           {:get_last_taken, Stats.last_taken_at(timer_id)} do
-      last_taken_on =
-        case last_taken_at do
-          nil -> nil
-          datetime -> datetime |> DateTime.to_date() |> Date.to_iso8601()
-        end
-
+    with {:ok, today} <- get_date(),
+         {:ok, streak_length} <- streak_length(timer_id, today),
+         {:ok, last_taken_on} <- last_taken_on(timer_id) do
       send_resp(
         conn,
         200,
@@ -32,47 +23,82 @@ defmodule Pillminder.WebRouter.Stats do
         |> Poison.encode!()
       )
     else
-      {:get_time, {:error, reason}} ->
-        Logger.error("Failed to get current time: #{inspect(reason)}")
-        send_resp(conn, 500, "")
-
-      {:get_streak, {:error, reason}} ->
-        Logger.error("Failed to fetch streak length for timer #{timer_id}: #{inspect(reason)}")
-        send_resp(conn, 500, "")
-
-      {:get_last_taken, {:error, reason}} ->
-        Logger.error("Failed to fetch last taken at time for #{timer_id}: #{inspect(reason)}")
-        send_resp(conn, 500, "")
+      {:error, _reason} -> send_resp(conn, 500, "")
     end
   end
 
   get "/:timer_id/history" do
-    with {:get_time, {:ok, now}} <- {:get_time, Timex.local() |> Util.Error.ok_or()},
-         today = DateTime.to_date(now),
-         {:get_log, {:ok, taken_dates}} <-
-           {:get_log, Stats.taken_dates(timer_id, today)} do
-      iso_taken_log =
-        taken_dates
-        |> Enum.map(fn {date, taken} -> {Date.to_iso8601(date), taken} end)
-        |> Enum.into(%{})
-
+    with {:ok, today} <- get_date(),
+         {:ok, taken_log} <- taken_dates(timer_id, today) do
       send_resp(
         conn,
         200,
-        %{taken_dates: iso_taken_log} |> Poison.encode!()
+        %{taken_dates: taken_log} |> Poison.encode!()
       )
     else
-      {:get_time, {:error, reason}} ->
-        Logger.error("Failed to get current time: #{inspect(reason)}")
-        send_resp(conn, 500, "")
-
-      {:get_log, {:error, reason}} ->
-        Logger.error("Failed generate taken log for #{timer_id}: #{inspect(reason)}")
+      {:error, _reason} ->
         send_resp(conn, 500, "")
     end
   end
 
   match _ do
     send_resp(conn, 404, "")
+  end
+
+  @spec get_date() :: {:ok, Date.t()} | {:error, {:get_time, any()}}
+  defp get_date() do
+    case Timex.local() |> Util.Error.ok_or() do
+      {:ok, now} ->
+        {:ok, DateTime.to_date(now)}
+
+      {:error, reason} ->
+        Logger.error("Failed to get current date: #{inspect(reason)}")
+        {:error, {:get_time, reason}}
+    end
+  end
+
+  @spec streak_length(String.t(), Date.t()) :: {:ok, number()} | {:error, {:streak_length, any()}}
+  defp streak_length(timer_id, today) do
+    case Stats.streak_length(timer_id, today) do
+      {:ok, length} ->
+        {:ok, length}
+
+      {:error, reason} ->
+        Logger.error("Failed to fetch streak length for timer #{timer_id}: #{inspect(reason)}")
+        {:error, {:streak_length, reason}}
+    end
+  end
+
+  @spec last_taken_on(String.t()) :: {:ok, Date.t() | nil} | {:error, {:last_taken_at, any()}}
+  defp last_taken_on(timer_id) do
+    case Stats.last_taken_at(timer_id) do
+      {:ok, nil} ->
+        {:ok, nil}
+
+      {:ok, last_taken_at} ->
+        {:ok, last_taken_at |> DateTime.to_date() |> Date.to_iso8601()}
+
+      {:error, reason} ->
+        Logger.error("Failed to fetch last taken at time for #{timer_id}: #{inspect(reason)}")
+        {:error, {:last_taken_at, reason}}
+    end
+  end
+
+  @spec taken_dates(String.t(), Date.t()) ::
+          {:ok, %{String.t() => boolean()}} | {:error, {:taken_dates, any()}}
+  defp taken_dates(timer_id, today) do
+    case Stats.taken_dates(timer_id, today) do
+      {:ok, taken_dates} ->
+        iso_taken_log =
+          taken_dates
+          |> Enum.map(fn {date, taken} -> {Date.to_iso8601(date), taken} end)
+          |> Map.new()
+
+        {:ok, iso_taken_log}
+
+      {:error, reason} ->
+        Logger.error("Failed generate taken log for #{timer_id}: #{inspect(reason)}")
+        {:error, {:taken_dates, reason}}
+    end
   end
 end
