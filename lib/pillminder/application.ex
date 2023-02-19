@@ -16,6 +16,7 @@ defmodule Pillminder.Application do
       Pillminder.Stats.Repo,
       {Pillminder.ReminderSender, make_senders_for_timers(timers)},
       {Scheduler, make_scheduler_args(timers)},
+      Pillminder.Auth,
       # # TODO: Add port to config file
       {Plug.Cowboy, scheme: :http, plug: Pillminder.WebRouter, options: [port: 8000]}
     ]

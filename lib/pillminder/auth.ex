@@ -1,10 +1,36 @@
 defmodule Pillminder.Auth do
   alias Pillminder.Auth.TokenAuthenticator
+  use Supervisor
 
   @access_code_length 6
   @session_token_length 64
-  @access_code_server_name AccessTokenAuthenticator
-  @session_token_server_name SessionTokenAuthenticator
+  @access_code_server_name __MODULE__.AccessTokenAuthenticator
+  @session_token_server_name __MODULE__.SessionTokenAuthenticator
+
+  @type auth_opts :: [fixed_tokens: [String.t()]]
+
+  @spec start_link(auth_opts()) :: {:ok, pid} | {:error, any} | :ignore
+  def start_link(opts) do
+    Supervisor.start_link(__MODULE__, opts, name: __MODULE__)
+  end
+
+  @impl true
+  def init(opts) do
+    fixed_tokens = Keyword.get(opts, :fixed_tokens, [])
+
+    children = [
+      Supervisor.child_spec(
+        {TokenAuthenticator,
+         fixed_tokens: fixed_tokens, server_opts: [name: @session_token_server_name]},
+        id: @session_token_server_name
+      ),
+      Supervisor.child_spec({TokenAuthenticator, server_opts: [name: @access_code_server_name]},
+        id: @access_code_server_name
+      )
+    ]
+
+    Supervisor.init(children, strategy: :one_for_one)
+  end
 
   @doc """
   Check if the given token is valid for the given pillminder.
