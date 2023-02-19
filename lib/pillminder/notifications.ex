@@ -10,7 +10,7 @@ defmodule Pillminder.Notifications do
 
   @spec send_reminder_notification(String.t()) :: :ok | {:error, :no_such_timer | any()}
   def send_reminder_notification(timer_id) do
-    case get_timer_metadata(timer_id) do
+    case Pillminder.lookup_timer(timer_id) do
       nil ->
         {:error, :no_such_timer}
 
@@ -23,7 +23,7 @@ defmodule Pillminder.Notifications do
   @spec send_access_code_notification(String.t(), String.t()) ::
           :ok | {:error, :no_such_timer | any()}
   def send_access_code_notification(timer_id, access_code) do
-    case get_timer_metadata(timer_id) do
+    case Pillminder.lookup_timer(timer_id) do
       nil ->
         {:error, :no_such_timer}
 
@@ -31,12 +31,6 @@ defmodule Pillminder.Notifications do
         body = access_code_notification_body(access_code)
         send_ntfy_notification(timer, body)
     end
-  end
-
-  @spec get_timer_metadata(String.t()) :: Config.Timer.t() | nil
-  defp get_timer_metadata(timer_id) do
-    Config.load_timers_from_env!()
-    |> Enum.find(fn timer -> timer.id == timer_id end)
   end
 
   @spec send_ntfy_notification(Config.Timer.t(), %{atom() => any()}) ::

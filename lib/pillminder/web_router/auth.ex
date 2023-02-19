@@ -9,15 +9,17 @@ defmodule Pillminder.WebRouter.Auth do
 
   post "/access-code" do
     with {:ok, pillminder} <- body_value(conn, "pillminder"),
-         # TODO: There is a memory leak/DoS vector here if someone just attempts to make access codes
-         # for pillminders that just consistently don't exist. Maybe we should check that earlier...
+         :ok <- pillminder_must_exist(pillminder),
          {:ok, access_code} <- new_access_code(pillminder),
          :ok <- send_access_code(pillminder, access_code) do
       send_resp(conn, 204, "")
     else
       {:error, {:missing_in_body, _key}} ->
         Logger.debug("No pillminder found in request")
-        send_resp(conn, 400, "")
+
+      {:error, {:no_such_pillminder, pillminder}} ->
+        Logger.debug("Pillminder #{pillminder} not found")
+        send_resp(conn, 400, Poison.encode!(%{error: "Invalid pillminder"}))
 
       {:error, {:make_access_code, reason}} ->
         # I would log the pillminder here but it isn't defined at this point...
@@ -28,10 +30,6 @@ defmodule Pillminder.WebRouter.Auth do
         # I would log the pillminder here but it isn't defined at this point...
         Logger.error("Failed to generate access code: #{reason}")
         send_resp(conn, 500, "")
-
-      {:error, {:send_access_code, {:no_such_timer, pillminder}}} ->
-        Logger.info("Could not send access code for undefined pillminder #{pillminder}")
-        send_resp(conn, 400, "")
 
       {:error, {:send_access_code, reason}} ->
         # I would log the pillminder here but it isn't defined at this point...
@@ -71,6 +69,14 @@ defmodule Pillminder.WebRouter.Auth do
     case Map.get(conn.body_params, key) do
       nil -> {:error, {:missing_in_body, key}}
       pillminder -> {:ok, pillminder}
+    end
+  end
+
+  @spec pillminder_must_exist(String.t()) :: :ok | {:error, {:no_such_pillminder, String.t()}}
+  defp pillminder_must_exist(pillminder) do
+    case Pillminder.lookup_timer(pillminder) do
+      nil -> {:error, {:no_such_pillminder, pillminder}}
+      _ -> :ok
     end
   end
 
