@@ -1,4 +1,4 @@
-defmodule Pillminder.Ntfy.HttpClient do
+defmodule Pillminder.Notifications.Ntfy.HttpClient do
   use HTTPoison.Base
   @base_url "https://ntfy.sh"
 

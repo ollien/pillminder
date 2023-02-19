@@ -39,15 +39,15 @@ defmodule Pillminder.Application do
   @spec make_remind_func_for_timer(Config.Timer.t()) :: SendServer.remind_func()
   defp make_remind_func_for_timer(timer) do
     fn ->
-      Logger.debug("Sending notification request to ntfy for #{timer.id}")
+      Logger.debug("Sending reminder notification for #{timer.id}")
 
-      {:ok, resp} =
-        Pillminder.Ntfy.push_notification(
-          timer.ntfy_topic,
-          Pillminder.make_notification_body(timer)
-        )
+      case Pillminder.Notifications.send_reminder_notification(timer.id) do
+        :ok ->
+          :ok
 
-      Logger.debug("Got response from ntfy: #{inspect(resp)}")
+        {:error, reason} ->
+          Logger.error("Failed to send reminder notification for #{timer.id}: #{reason}")
+      end
     end
   end
 
