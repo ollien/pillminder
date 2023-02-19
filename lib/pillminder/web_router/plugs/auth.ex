@@ -47,7 +47,7 @@ defmodule Pillminder.WebRouter.Plugs.Auth do
   @spec halt_with_status(Plug.Conn.t(), number()) :: Plug.Conn.t()
   defp halt_with_status(conn, status) do
     conn
-    |> send_resp(status, "")
+    |> send_resp(status, "{}")
     |> halt
   end
 

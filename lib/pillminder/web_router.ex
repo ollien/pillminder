@@ -18,9 +18,19 @@ defmodule Pillminder.WebRouter do
   @impl Plug.ErrorHandler
   def handle_errors(conn, _error) do
     # We must do this so we don't send back the default "Something went wrong" string back to the client whenever
-    # there is an error. Some internal Plug exceptions require use Plug.ErrorHandler in order to get proper status
-    # code returned.
-    send_resp(conn, conn.status, "")
+    # there is an error, and also ensure we always return some kind of valid JSON when the status code is somewhat
+    # meaningful (e.g. an empty 400 is annoying because sometimes we may want to return actual JSON there). Some
+    # internal Plug exceptions require use Plug.ErrorHandler in order to get proper status code returned.
+
+    body =
+      if conn.status == 500 do
+        # Internal errors are fine to not have a response, I think...
+        ""
+      else
+        "{}"
+      end
+
+    send_resp(conn, conn.status, body)
   end
 
   plug(:match)

@@ -51,10 +51,10 @@ defmodule Pillminder.WebRouter.Auth do
     else
       {:error, {:missing_in_body, _key}} ->
         Logger.debug("No access code found in request")
-        send_resp(conn, 400, "")
+        send_resp(conn, 400, Poison.encode!(%{error: "Access code is required"}))
 
       {:error, {:exchange_token, :invalid_access_code}} ->
-        send_resp(conn, 400, "")
+        send_resp(conn, 400, Poison.encode!(%{error: "Invalid access code"}))
 
       {:error, {:exchange_token, reason}} ->
         # I would log the pillminder here but it isn't defined at this point...
