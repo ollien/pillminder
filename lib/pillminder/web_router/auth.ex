@@ -9,8 +9,11 @@ defmodule Pillminder.WebRouter.Auth do
 
   post "/access-code" do
     with {:ok, pillminder} <- body_value(conn, "pillminder"),
-         {:ok, access_code} <- new_access_code(pillminder) do
-      send_resp(conn, 200, Poison.encode!(%{access_code: access_code}))
+         # TODO: There is a memory leak/DoS vector here if someone just attempts to make access codes
+         # for pillminders that just consistently don't exist. Maybe we should check that earlier...
+         {:ok, access_code} <- new_access_code(pillminder),
+         :ok <- send_access_code(pillminder, access_code) do
+      send_resp(conn, 204, "")
     else
       {:error, {:missing_in_body, _key}} ->
         Logger.debug("No pillminder found in request")
@@ -19,6 +22,20 @@ defmodule Pillminder.WebRouter.Auth do
       {:error, {:make_access_code, reason}} ->
         # I would log the pillminder here but it isn't defined at this point...
         Logger.error("Failed to generate access code: #{reason}")
+        send_resp(conn, 500, "")
+
+      {:error, {:make_access_code, reason}} ->
+        # I would log the pillminder here but it isn't defined at this point...
+        Logger.error("Failed to generate access code: #{reason}")
+        send_resp(conn, 500, "")
+
+      {:error, {:send_access_code, {:no_such_timer, pillminder}}} ->
+        Logger.info("Could not send access code for undefined pillminder #{pillminder}")
+        send_resp(conn, 400, "")
+
+      {:error, {:send_access_code, reason}} ->
+        # I would log the pillminder here but it isn't defined at this point...
+        Logger.error("Failed to send access code: #{reason}")
         send_resp(conn, 500, "")
     end
   end
@@ -63,6 +80,16 @@ defmodule Pillminder.WebRouter.Auth do
     case Pillminder.Auth.make_access_code(pillminder) do
       {:ok, access_code} -> {:ok, access_code}
       {:error, reason} -> {:error, {:make_access_code, reason}}
+    end
+  end
+
+  @spec send_access_code(String.t(), String.t()) ::
+          :ok | {:error, {:send_access_code, {:no_such_timer, String.t()} | any()}}
+  defp send_access_code(pillminder, access_code) do
+    case Pillminder.Notifications.send_access_code_notification(pillminder, access_code) do
+      :ok -> :ok
+      {:error, :no_such_timer} -> {:error, {:send_access_code, {:no_such_timer, pillminder}}}
+      {:error, reason} -> {:error, {:send_access_code, reason}}
     end
   end
 

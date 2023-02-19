@@ -1,7 +1,8 @@
 defmodule Pillminder.Notifications do
   @moduledoc """
-  Facilities sending various notification types for different pillminders
+  Facilitates sending various notification types for different pillminders
   """
+
   require Logger
 
   alias Pillminder.Config
@@ -19,6 +20,19 @@ defmodule Pillminder.Notifications do
     end
   end
 
+  @spec send_access_code_notification(String.t(), String.t()) ::
+          :ok | {:error, :no_such_timer | any()}
+  def send_access_code_notification(timer_id, access_code) do
+    case get_timer_metadata(timer_id) do
+      nil ->
+        {:error, :no_such_timer}
+
+      timer ->
+        body = access_code_notification_body(access_code)
+        send_ntfy_notification(timer, body)
+    end
+  end
+
   @spec get_timer_metadata(String.t()) :: Config.Timer.t() | nil
   defp get_timer_metadata(timer_id) do
     Config.load_timers_from_env!()
@@ -26,7 +40,7 @@ defmodule Pillminder.Notifications do
   end
 
   @spec send_ntfy_notification(Config.Timer.t(), %{atom() => any()}) ::
-          :ok | {:error, {:ntfy, any()}}
+          :ok | {:error, {:ntfy_error, any()}}
   defp send_ntfy_notification(timer, body) do
     case Ntfy.push_notification(timer.ntfy_topic, body) do
       {:ok, resp} ->
@@ -58,6 +72,14 @@ defmodule Pillminder.Notifications do
           method: "POST"
         }
       ]
+    }
+  end
+
+  @spec access_code_notification_body(String.t()) :: %{atom() => any()}
+  defp access_code_notification_body(access_code) do
+    %{
+      title: "Your Pillminder access code",
+      message: access_code
     }
   end
 end
