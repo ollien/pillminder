@@ -3,10 +3,12 @@ defmodule Pillminder.WebRouter.Stats do
 
   alias Pillminder.Stats
   alias Pillminder.Util
+  alias Pillminder.WebRouter.Plugs
 
   use Plug.Router
 
   plug(:match)
+  plug(Plugs.Auth)
   plug(:dispatch)
 
   get "/:timer_id/summary" do

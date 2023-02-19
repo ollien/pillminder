@@ -4,10 +4,12 @@ defmodule Pillminder.WebRouter.Timer do
   alias Pillminder.Stats
   alias Pillminder.Util.QueryParam
   alias Pillminder.ReminderSender
+  alias Pillminder.WebRouter.Plugs
 
   use Plug.Router
 
   plug(:match)
+  plug(Plugs.Auth)
   plug(:dispatch)
 
   @snooze_time_param "snooze_time"

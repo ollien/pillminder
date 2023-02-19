@@ -32,7 +32,8 @@ defmodule Pillminder.MixProject do
       {:ecto_sql, "~> 3.0"},
       {:ecto_sqlite3, "~> 0.9.1"},
       {:secure_random, "~> 0.5"},
-      {:briefly, "~> 0.3.0", only: [:test]}
+      {:briefly, "~> 0.3.0", only: [:test]},
+      {:ex_parameterized, "~> 1.3", only: [:test]}
     ]
   end
 
