@@ -2,6 +2,7 @@ defmodule PillminderTest.Auth.TokenAuthenticator do
   alias Pillminder.Auth.TokenAuthenticator
 
   use ExUnit.Case, async: true
+  use ExUnit.Parameterized
   doctest Pillminder.Auth.TokenAuthenticator
 
   # Server must be named so we can run more than one in unit tests
@@ -43,7 +44,7 @@ defmodule PillminderTest.Auth.TokenAuthenticator do
       TokenAuthenticator.token_data("1234", server_name: @server_name)
   end
 
-  test "rejects tokens after the expiry time as passed" do
+  test_with_params("rejects tokens after the expiry time as passed", fn token_type ->
     {:ok, clock_agent} =
       Agent.start_link(fn -> Timex.to_datetime({{2022, 3, 10}, {10, 0, 0}}) end)
 
@@ -56,11 +57,22 @@ defmodule PillminderTest.Auth.TokenAuthenticator do
       ]
     })
 
-    :ok = TokenAuthenticator.put_token("1234", "test-pillminder", server_name: @server_name)
+    :ok =
+      case token_type do
+        :expiry_based ->
+          TokenAuthenticator.put_token("1234", "test-pillminder", server_name: @server_name)
+
+        :single_use ->
+          TokenAuthenticator.put_single_use_token("1234", "test-pillminder",
+            server_name: @server_name
+          )
+      end
 
     Agent.update(clock_agent, fn _time -> Timex.to_datetime({{2022, 3, 10}, {11, 0, 0}}) end)
 
     assert TokenAuthenticator.token_data("1234", server_name: @server_name) == :invalid_token
+  end) do
+    [{:expiry_based}, {:single_use}]
   end
 
   test "expiry based tokens can be retrieved multiple times" do

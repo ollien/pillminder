@@ -137,23 +137,33 @@ defmodule Pillminder.Auth.TokenAuthenticator do
           token_action()
   defp get_token_lookup_action(token, known_tokens, clock_source) do
     case Map.get(known_tokens, token) do
-      nil ->
-        :reject
-
-      %{token_type: :fixed} ->
-        :accept
-
-      %{token_type: :single_use} ->
-        :accept_and_delete
-
-      token_data = %{token_type: :expiry_based} ->
-        get_expiry_based_token_lookup_action(token_data, clock_source)
+      nil -> :reject
+      %{token_type: :fixed} -> :accept
+      token_data -> get_dynamic_token_lookup_action(token_data, clock_source)
     end
   end
 
-  @spec get_expiry_based_token_lookup_action(token_data(), clock_source()) :: token_action()
-  defp get_expiry_based_token_lookup_action(
+  @spec get_dynamic_token_lookup_action(token_data(), clock_source()) :: token_action()
+  defp get_dynamic_token_lookup_action(
          _token_data = %{token_type: :expiry_based, expires_at: expires_at},
+         clock_source
+       ) do
+    get_token_action_by_expiry(expires_at, clock_source)
+  end
+
+  defp get_dynamic_token_lookup_action(
+         _token_data = %{token_type: :single_use, expires_at: expires_at},
+         clock_source
+       ) do
+    case get_token_action_by_expiry(expires_at, clock_source) do
+      :accept -> :accept_and_delete
+      :reject -> :reject
+    end
+  end
+
+  @spec get_token_action_by_expiry(DateTime.t(), clock_source()) :: token_action()
+  defp get_token_action_by_expiry(
+         expires_at,
          clock_source
        ) do
     now = clock_source.()
@@ -168,20 +178,10 @@ defmodule Pillminder.Auth.TokenAuthenticator do
   @spec store_token(String.t(), :expiry_based | :single_use, String.t(), State.t()) ::
           {:ok | {:error, any()}, State.t()}
   defp store_token(token, token_type, for_pillminder, state) do
-    build_token_data_fn =
-      case token_type do
-        :expiry_based ->
-          fn ->
-            make_expiry_based_token_data(state.clock_source, state.expiry_time, for_pillminder)
-          end
+    token_data_res =
+      make_dynamic_token_data(state.clock_source, state.expiry_time, token_type, for_pillminder)
 
-        :single_use ->
-          fn ->
-            {:ok, make_single_use_token_data(for_pillminder)}
-          end
-      end
-
-    case build_token_data_fn.() do
+    case token_data_res do
       {:ok, token_data} ->
         next_tokens = Map.put(state.tokens, token, token_data)
         next_state = %State{state | tokens: next_tokens}
@@ -198,17 +198,22 @@ defmodule Pillminder.Auth.TokenAuthenticator do
     %{expires_at: :never, pillminder: :all, token_type: :fixed}
   end
 
-  @spec make_expiry_based_token_data(clock_source(), Timex.Duration.t(), String.t()) ::
+  @spec make_dynamic_token_data(
+          clock_source(),
+          Timex.Duration.t(),
+          :expiry_based | :single_use,
+          String.t()
+        ) ::
           {:ok, token_data()} | {:error, any}
-  defp make_expiry_based_token_data(clock_source, expiry_time, for_pillminder) do
+  defp make_dynamic_token_data(clock_source, expiry_time, token_type, for_pillminder) do
     now = clock_source.()
 
-    case Timex.add(now, expiry_time) |> Util.Error.ok_or() do
-      {:ok, expiry_time} ->
+    case expiry_timestamp(now, expiry_time) do
+      {:ok, expiry_timestamp} ->
         data = %{
-          expires_at: expiry_time,
+          expires_at: expiry_timestamp,
           pillminder: for_pillminder,
-          token_type: :expiry_based
+          token_type: token_type
         }
 
         {:ok, data}
@@ -218,12 +223,9 @@ defmodule Pillminder.Auth.TokenAuthenticator do
     end
   end
 
-  @spec make_single_use_token_data(String.t()) :: token_data()
-  defp make_single_use_token_data(for_pillminder) do
-    %{
-      expires_at: :never,
-      pillminder: for_pillminder,
-      token_type: :single_use
-    }
+  @spec expiry_timestamp(DateTime.t(), Timex.Duration.t()) ::
+          {:ok, DateTime.t()} | {:error, any()}
+  defp expiry_timestamp(now, expiry_time) do
+    Timex.add(now, expiry_time) |> Util.Error.ok_or()
   end
 end
