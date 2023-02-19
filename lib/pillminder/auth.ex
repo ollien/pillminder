@@ -1,4 +1,8 @@
 defmodule Pillminder.Auth do
+  @moduledoc """
+  Auth handles token management for authenticating requests when accessing pillminders/timers.
+  """
+
   alias Pillminder.Auth.TokenAuthenticator
   use Supervisor
 
