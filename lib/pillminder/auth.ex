@@ -12,6 +12,7 @@ defmodule Pillminder.Auth do
   @session_token_server_name __MODULE__.SessionTokenAuthenticator
 
   @type auth_opts :: [fixed_tokens: [String.t()]]
+  @type access_code_exchange_info :: %{token: String.t(), pillminder: String.t()}
 
   @spec start_link(auth_opts()) :: {:ok, pid} | {:error, any} | :ignore
   def start_link(opts) do
@@ -80,12 +81,23 @@ defmodule Pillminder.Auth do
   Exchange an access code for a session token. If the access code is invalid, then {:error, :invalid_access_code} is returned.
   """
   @spec exchange_access_code(String.t()) ::
-          {:ok, String.t()} | {:error, :invalid_access_code | any()}
+          {:ok, access_code_exchange_info()} | {:error, :invalid_access_code | any()}
   def exchange_access_code(access_code) do
+    with {:ok, data} <- access_code_data(access_code),
+         {:ok, token} <- make_token(data.pillminder) do
+      {:ok, %{pillminder: data.pillminder, token: token}}
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @spec access_code_data(String.t()) ::
+          {:ok, TokenAuthenticator.token_data()} | {:error, :invalid_access_code}
+  defp access_code_data(access_code) do
     token_data = TokenAuthenticator.token_data(access_code, server_name: @access_code_server_name)
 
     case token_data do
-      %{pillminder: pillminder} -> make_token(pillminder)
+      %{pillminder: _pillminder} -> {:ok, token_data}
       :invalid_token -> {:error, :invalid_access_code}
     end
   end

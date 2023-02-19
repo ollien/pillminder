@@ -54,14 +54,14 @@ defmodule PillminderTest.Auth do
 
     test "access code can be exchanged for session token on that pillminder" do
       {:ok, access_code} = Auth.make_access_code("my-pillminder")
-      {:ok, session_token} = Auth.exchange_access_code(access_code)
+      {:ok, %{token: session_token}} = Auth.exchange_access_code(access_code)
 
       assert Auth.token_valid_for_pillminder?(session_token, "my-pillminder")
     end
 
     test "produced session token is not valid for another pillminder" do
       {:ok, access_code} = Auth.make_access_code("my-pillminder")
-      {:ok, session_token} = Auth.exchange_access_code(access_code)
+      {:ok, %{token: session_token}} = Auth.exchange_access_code(access_code)
 
       assert not Auth.token_valid_for_pillminder?(session_token, "some-other-pillminder")
     end
