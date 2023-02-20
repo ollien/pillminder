@@ -11,7 +11,6 @@ export enum Status {
 interface HistoryChipProps {
 	status: Status;
 	label: string;
-	key?: string;
 }
 
 const assertUnreachable = <T,>(x: never): T => {
@@ -46,13 +45,8 @@ const iconForStatus = (status: Status): As<any> => {
 	}
 };
 
-const HistoryChip = ({ status, label, key }: HistoryChipProps) => (
-	<Tag
-		size="lg"
-		minWidth="fit-content"
-		colorScheme={colorForStatus(status)}
-		key={key}
-	>
+const HistoryChip = ({ status, label }: HistoryChipProps) => (
+	<Tag size="lg" minWidth="fit-content" colorScheme={colorForStatus(status)}>
 		<TagLeftIcon boxSize={2} as={iconForStatus(status)}></TagLeftIcon>
 		<TagLabel>{label}</TagLabel>
 	</Tag>
