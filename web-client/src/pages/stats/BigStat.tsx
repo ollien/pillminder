@@ -12,7 +12,7 @@ const BigStat = ({ value, name }: BigStatProps) => {
 			<Text fontSize={{ base: "6rem", lg: "4rem" }} marginBottom="-6">
 				{value}
 			</Text>
-			<Text fontSize="lg">{name}</Text>
+			<Text fontSize={{ base: "2xl", lg: "lg" }}>{name}</Text>
 		</Stack>
 	);
 };

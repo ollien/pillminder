@@ -1,6 +1,10 @@
-import { CheckIcon, CloseIcon, MinusIcon } from "@chakra-ui/icons";
-import { As, Tag, TagLabel, TagLeftIcon } from "@chakra-ui/react";
+import { As, ListIcon, ListItem } from "@chakra-ui/react";
 import React from "react";
+import {
+	AiOutlineCheckCircle,
+	AiOutlineCloseCircle,
+	AiOutlineHourglass,
+} from "react-icons/ai";
 
 export enum Status {
 	TAKEN,
@@ -8,7 +12,7 @@ export enum Status {
 	NOT_TAKEN_YET,
 }
 
-interface HistoryChipProps {
+interface HistoryListItemProps {
 	status: Status;
 	label: string;
 }
@@ -24,7 +28,7 @@ const colorForStatus = (status: Status): string => {
 		case Status.NOT_TAKEN:
 			return "red";
 		case Status.NOT_TAKEN_YET:
-			return "blue";
+			return "gray";
 		default:
 			return assertUnreachable(status);
 	}
@@ -35,21 +39,21 @@ const colorForStatus = (status: Status): string => {
 const iconForStatus = (status: Status): As<any> => {
 	switch (status) {
 		case Status.TAKEN:
-			return CheckIcon;
+			return AiOutlineCheckCircle;
 		case Status.NOT_TAKEN:
-			return CloseIcon;
+			return AiOutlineCloseCircle;
 		case Status.NOT_TAKEN_YET:
-			return MinusIcon;
+			return AiOutlineHourglass;
 		default:
 			return assertUnreachable(status);
 	}
 };
 
-const HistoryChip = ({ status, label }: HistoryChipProps) => (
-	<Tag size="lg" minWidth="fit-content" colorScheme={colorForStatus(status)}>
-		<TagLeftIcon boxSize={2} as={iconForStatus(status)}></TagLeftIcon>
-		<TagLabel>{label}</TagLabel>
-	</Tag>
+const HistoryListItem = ({ status, label }: HistoryListItemProps) => (
+	<ListItem fontSize={{ base: "3xl", lg: "2xl" }}>
+		<ListIcon as={iconForStatus(status)} color={colorForStatus(status)} />
+		<span style={{ verticalAlign: "-0.125em" }}>{label}</span>
+	</ListItem>
 );
 
-export default HistoryChip;
+export default HistoryListItem;

@@ -2,9 +2,9 @@ import {
 	CardBody,
 	CardHeader,
 	Center,
-	Divider,
 	Heading,
-	Stack,
+	HStack,
+	StackDivider,
 } from "@chakra-ui/react";
 import {
 	getStatsSummary,
@@ -103,21 +103,25 @@ const Stats = ({ pillminder, token }: StatsProps) => {
 	const [takenDates, takenDatesError] = useAPI(takenDatesCallback);
 
 	const statsBody = (
-		<Stack spacing={4}>
+		<HStack
+			divider={<StackDivider />}
+			justifyContent="space-evenly"
+			alignItems="stretch"
+			height="100%"
+		>
 			<Loadable
 				isLoading={statsSummary == null && statsSummaryError == null}
 				error={statsSummaryError}
 			>
 				<Summary statsSummary={statsSummary!} />
 			</Loadable>
-			<Divider />
 			<Loadable
 				isLoading={takenDates == null && takenDatesError == null}
 				error={takenDatesError}
 			>
 				<History takenDates={takenDates!} />
 			</Loadable>
-		</Stack>
+		</HStack>
 	);
 
 	const emptyPillminderError = makeEmptyPillminderError(pillminder);

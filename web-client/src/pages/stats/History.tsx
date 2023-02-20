@@ -1,8 +1,8 @@
-import { Center, HStack } from "@chakra-ui/react";
+import { List } from "@chakra-ui/react";
 import { TakenDate } from "pillminder-webclient/src/lib/api";
-import HistoryChip, {
+import HistoryListItem, {
 	Status as HistoryStatus,
-} from "pillminder-webclient/src/pages/stats/HistoryChip";
+} from "pillminder-webclient/src/pages/stats/HistoryListItem";
 import React from "react";
 
 interface HistoryProps {
@@ -11,7 +11,7 @@ interface HistoryProps {
 
 const History = ({ takenDates }: HistoryProps) => {
 	const listItems = takenDates.map((takenDate, idx) => {
-		const dateDisplay = takenDate.date.toLocaleString({ dateStyle: "short" });
+		const dateDisplay = takenDate.date.toLocaleString({ dateStyle: "medium" });
 		const status = (() => {
 			if (idx == 0 && !takenDate.taken) {
 				return HistoryStatus.NOT_TAKEN_YET;
@@ -23,22 +23,15 @@ const History = ({ takenDates }: HistoryProps) => {
 		})();
 
 		return (
-			<HistoryChip
-				status={status}
+			<HistoryListItem
+				key={`history-list-${dateDisplay}`}
 				label={dateDisplay}
-				key={dateDisplay}
-			></HistoryChip>
+				status={status}
+			/>
 		);
 	});
-	listItems.reverse();
 
-	return (
-		<Center>
-			<HStack spacing={2} overflowX="scroll">
-				{listItems}
-			</HStack>
-		</Center>
-	);
+	return <List spacing={4}>{listItems}</List>;
 };
 
 export default History;
