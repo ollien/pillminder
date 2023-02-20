@@ -37,9 +37,18 @@ export async function requestAccessCode(pillminder: string): Promise<void> {
 		},
 	});
 
+	const getErrorMsg = async () => {
+		try {
+			const resJSON = await res.json();
+			return resJSON.error ?? "Failed to request token";
+		} catch (e) {
+			return "Failed to request token";
+		}
+	};
+
 	if (res.status >= 400) {
-		// TODO: Use the error messages the server gives us.
-		throw new Error("Failed to request token");
+		const msg = await getErrorMsg();
+		throw new Error(msg);
 	}
 }
 
