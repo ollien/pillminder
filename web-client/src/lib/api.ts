@@ -17,6 +17,26 @@ export interface TakenDate {
 }
 
 /**
+ * Request an access code for the given pillminder. This will be sent to a user, and not returned to us.
+ *
+ * @param pillminder The pillminder to request an access code for
+ */
+export async function requestAccessCode(pillminder: string): Promise<void> {
+	const res = await fetch("/auth/access-code", {
+		method: "POST",
+		body: JSON.stringify({ pillminder }),
+		headers: {
+			"Content-Type": "application/json",
+		},
+	});
+
+	if (res.status >= 400) {
+		// TODO: Use the error messages the server gives us.
+		throw new Error("Failed to request token");
+	}
+}
+
+/**
  * Get statistics about the given pillminder
  * @param pillminder The pillminder to get a summary for
  * @returns A summary of the given pillminder. Note that if a pillminder is not found, empty information
@@ -27,7 +47,7 @@ export async function getStatsSummary(
 ): Promise<StatsSummary> {
 	const res = await fetch(`/stats/${encodeURIComponent(pillminder)}/summary`);
 
-	if (res.status !== 200) {
+	if (res.status >= 400) {
 		// This api doesn't return any real errors, so we can just give a generic message
 		throw new Error("Failed to load streak");
 	}
@@ -47,7 +67,7 @@ export async function getStatsSummary(
  */
 export async function getTakenDates(pillminder: string): Promise<TakenDate[]> {
 	const res = await fetch(`/stats/${encodeURIComponent(pillminder)}/history`);
-	if (res.status !== 200) {
+	if (res.status >= 400) {
 		throw new Error("Failed to load taken dates");
 	}
 

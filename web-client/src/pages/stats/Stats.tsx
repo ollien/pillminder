@@ -5,13 +5,13 @@ import {
 	Divider,
 	Heading,
 	Stack,
-	Text,
 } from "@chakra-ui/react";
 import {
 	getStatsSummary,
 	getTakenDates,
 } from "pillminder-webclient/src/lib/api";
 import CardPage from "pillminder-webclient/src/pages/_common/CardPage";
+import ErrorText from "pillminder-webclient/src/pages/_common/ErrorText";
 import History from "pillminder-webclient/src/pages/stats/History";
 import Loadable from "pillminder-webclient/src/pages/stats/Loadable";
 import Summary from "pillminder-webclient/src/pages/stats/Summary";
@@ -113,9 +113,7 @@ const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
 	const emptyPillminderError = makeEmptyPillminderError(pillminder);
 	const makeEmptyPillminderErrorElement = emptyPillminderError ? (
 		<Center>
-			<Text color="red.400" fontSize="lg" fontWeight="bold">
-				{emptyPillminderError}
-			</Text>
+			<ErrorText>{emptyPillminderError}</ErrorText>
 		</Center>
 	) : null;
 

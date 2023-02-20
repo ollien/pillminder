@@ -32,7 +32,8 @@
 				"argsIgnorePattern": "^_"
 			}
 		],
-		"@typescript-eslint/no-non-null-assertion": "off"
+		"@typescript-eslint/no-non-null-assertion": "off",
+		"@typescript-eslint/no-inferrable-types": "off"
 	},
 	"settings": {
 		"react": {
