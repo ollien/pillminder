@@ -18,6 +18,12 @@ import Summary from "pillminder-webclient/src/pages/stats/Summary";
 import React, { useCallback, useEffect, useState } from "react";
 
 const NO_PILLMINDER_ERROR = "No pillminder selected";
+const INVALID_TOKEN_ERROR = "Your session has expired. Please log in again";
+
+interface StatsProps {
+	pillminder?: string;
+	token?: string;
+}
 
 const makeErrorString = (err: Error | unknown): string => {
 	if (err instanceof Error && err.cause != null) {
@@ -61,35 +67,39 @@ const useAPI = <T,>(doFetch: () => Promise<T>): [T?, string?] => {
 	return [data, error];
 };
 
-const Stats = ({ pillminder }: { pillminder: string | undefined }) => {
+const Stats = ({ pillminder, token }: StatsProps) => {
 	const summaryCallback = useCallback(async () => {
 		if (pillminder == null) {
 			throw Error(NO_PILLMINDER_ERROR);
+		} else if (token == null) {
+			throw Error(INVALID_TOKEN_ERROR);
 		}
 
 		try {
-			return getStatsSummary(pillminder);
+			return getStatsSummary(token, pillminder);
 		} catch (err) {
 			throw new Error("Failed to fetch summary", {
 				cause: makeErrorString(err),
 			});
 		}
-	}, [pillminder]);
+	}, [pillminder, token]);
 	const [statsSummary, statsSummaryError] = useAPI(summaryCallback);
 
 	const takenDatesCallback = useCallback(async () => {
 		if (pillminder == null) {
 			throw Error(NO_PILLMINDER_ERROR);
+		} else if (token == null) {
+			throw Error(INVALID_TOKEN_ERROR);
 		}
 
 		try {
-			return getTakenDates(pillminder);
+			return getTakenDates(token, pillminder);
 		} catch (err) {
 			throw new Error("Failed to fetch taken dates", {
 				cause: makeErrorString(err),
 			});
 		}
-	}, [pillminder]);
+	}, [pillminder, token]);
 	const [takenDates, takenDatesError] = useAPI(takenDatesCallback);
 
 	const statsBody = (

@@ -1,5 +1,7 @@
 import { DateTime } from "luxon";
 
+const INVALID_TOKEN_ERROR = "Your session has expired. Please log in again";
+
 /**
  * A summary of statistics about a user's medication
  */
@@ -14,6 +16,11 @@ export interface StatsSummary {
 export interface TakenDate {
 	date: DateTime;
 	taken: boolean;
+}
+
+export interface TokenInformation {
+	token: string;
+	pillminder: string;
 }
 
 /**
@@ -36,18 +43,44 @@ export async function requestAccessCode(pillminder: string): Promise<void> {
 	}
 }
 
+export async function exchangeAccessCode(
+	accessCode: string
+): Promise<TokenInformation> {
+	const res = await fetch("/auth/token", {
+		method: "POST",
+		body: JSON.stringify({ access_code: accessCode }),
+		headers: {
+			"Content-Type": "application/json",
+		},
+	});
+
+	if (res.status === 400) {
+		throw new Error("Invalid access code");
+	} else if (res.status > 400) {
+		throw new Error("Failed to validate access code");
+	}
+
+	return res.json();
+}
+
 /**
  * Get statistics about the given pillminder
+ * @param token The token for this session
  * @param pillminder The pillminder to get a summary for
  * @returns A summary of the given pillminder. Note that if a pillminder is not found, empty information
  *          will be returned.
  */
 export async function getStatsSummary(
+	token: string,
 	pillminder: string
 ): Promise<StatsSummary> {
-	const res = await fetch(`/stats/${encodeURIComponent(pillminder)}/summary`);
+	const res = await fetch(`/stats/${encodeURIComponent(pillminder)}/summary`, {
+		headers: { Authorization: `Token ${token}` },
+	});
 
-	if (res.status >= 400) {
+	if (res.status === 401) {
+		throw new Error(INVALID_TOKEN_ERROR);
+	} else if (res.status >= 400) {
 		// This api doesn't return any real errors, so we can just give a generic message
 		throw new Error("Failed to load streak");
 	}
@@ -62,12 +95,21 @@ export async function getStatsSummary(
 
 /**
  * Get the recent dates that the medication was taken
+ * @param token The token for this session
  * @param pillminder The pillminder to get history for
  * @returns Recent dates that the medication were taken. These will be consecutive.
  */
-export async function getTakenDates(pillminder: string): Promise<TakenDate[]> {
-	const res = await fetch(`/stats/${encodeURIComponent(pillminder)}/history`);
-	if (res.status >= 400) {
+export async function getTakenDates(
+	token: string,
+	pillminder: string
+): Promise<TakenDate[]> {
+	const res = await fetch(`/stats/${encodeURIComponent(pillminder)}/history`, {
+		headers: { Authorization: `Token ${token}` },
+	});
+
+	if (res.status === 401) {
+		throw new Error(INVALID_TOKEN_ERROR);
+	} else if (res.status >= 400) {
 		throw new Error("Failed to load taken dates");
 	}
 

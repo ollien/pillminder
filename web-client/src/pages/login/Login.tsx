@@ -9,7 +9,7 @@ const Login = () => (
 			<Heading size="md">Welcome to Pillminder</Heading>
 		</CardHeader>
 		<CardBody>
-			<LoginForm></LoginForm>
+			<LoginForm />
 		</CardBody>
 	</CardPage>
 );

@@ -4,13 +4,11 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 
 const getPillminder = (): string | undefined => {
-	const params = new URLSearchParams(window.location.search);
-	const pillminderParam = params.get("pillminder");
-	if (pillminderParam == null || pillminderParam === "") {
-		return undefined;
-	}
+	return localStorage.getItem("pillminder") ?? undefined;
+};
 
-	return pillminderParam;
+const getToken = (): string | undefined => {
+	return localStorage.getItem("token") ?? undefined;
 };
 
 const rootElement = document.getElementById("root");
@@ -18,6 +16,6 @@ const reactRoot = createRoot(rootElement!);
 
 reactRoot.render(
 	<ChakraProvider>
-		<Stats pillminder={getPillminder()} />
+		<Stats pillminder={getPillminder()} token={getToken()} />
 	</ChakraProvider>
 );
