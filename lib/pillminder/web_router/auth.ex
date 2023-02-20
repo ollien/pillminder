@@ -12,6 +12,7 @@ defmodule Pillminder.WebRouter.Auth do
          :ok <- pillminder_must_exist(pillminder),
          {:ok, access_code} <- new_access_code(pillminder),
          :ok <- send_access_code(pillminder, access_code) do
+      Logger.info("Created access code for pillminder #{pillminder}")
       send_resp(conn, 204, "")
     else
       {:error, {:missing_in_body, _key}} ->
@@ -41,6 +42,8 @@ defmodule Pillminder.WebRouter.Auth do
   post "/token" do
     with {:ok, access_code} <- body_value(conn, "access_code"),
          {:ok, access_code_info} <- exchange_access_code(access_code) do
+      Logger.info("Created token for pillminder #{access_code_info.pillminder}")
+
       response_data = %{pillminder: access_code_info.pillminder, token: access_code_info.token}
 
       send_resp(
