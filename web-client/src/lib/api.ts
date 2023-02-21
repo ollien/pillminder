@@ -27,6 +27,8 @@ export interface TokenInformation {
  * Request an access code for the given pillminder. This will be sent to a user, and not returned to us.
  *
  * @param pillminder The pillminder to request an access code for
+ * @returns A promise that will resolve when the access code has been sent. If the promise has not resolved,
+ *          nothing can be assumed.
  */
 export async function requestAccessCode(pillminder: string): Promise<void> {
 	const res = await fetch("/auth/access-code", {
@@ -52,6 +54,12 @@ export async function requestAccessCode(pillminder: string): Promise<void> {
 	}
 }
 
+/**
+ * Convert the given access code to a sessino token
+ *
+ * @param accessCode The access code to exchange
+ * @returns Information about the token.
+ */
 export async function exchangeAccessCode(
 	accessCode: string
 ): Promise<TokenInformation> {
