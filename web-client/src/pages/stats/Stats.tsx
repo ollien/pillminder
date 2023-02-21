@@ -43,6 +43,51 @@ const makeEmptyPillminderError = (pillminder: string | undefined) => {
 	return null;
 };
 
+const makeConsolidatedFetchError = (
+	...fetchErrors: (string | undefined)[]
+): string | null => {
+	if (
+		fetchErrors.length == 0 ||
+		!fetchErrors.every((item) => item === fetchErrors[0] && item != null)
+	) {
+		// Either the messages can't be conslidated, or there are no errors, which is fine. We just won't use them.
+		return null;
+	}
+
+	// We know that this can't be null from the `every` above.
+	return fetchErrors[0]!;
+};
+
+const makeErrorComponentMessage = (
+	pillminder: string | undefined,
+	...fetchErrors: (string | undefined)[]
+): string | null => {
+	const emptyPillminderError = makeEmptyPillminderError(pillminder);
+	if (emptyPillminderError) {
+		return emptyPillminderError;
+	}
+
+	const consolidatedFetchError = makeConsolidatedFetchError(...fetchErrors);
+	if (consolidatedFetchError) {
+		// We know from the `every` that this must be non-null.
+		return consolidatedFetchError;
+	}
+
+	return null;
+};
+
+const makeErrorComponent = (
+	pillminder: string | undefined,
+	...fetchErrors: (string | undefined)[]
+): JSX.Element | null => {
+	const errorMsg = makeErrorComponentMessage(pillminder, ...fetchErrors);
+	if (errorMsg == null) {
+		return null;
+	}
+
+	return StatsError(errorMsg);
+};
+
 const getHeadingMsg = (pillminder: string | undefined) => {
 	if (pillminder == null) {
 		return "Stats";
@@ -65,6 +110,14 @@ const useAPI = <T,>(doFetch: () => Promise<T>): [T?, string?] => {
 	}, [doFetch]);
 
 	return [data, error];
+};
+
+const StatsError = (msg: string) => {
+	return (
+		<Center>
+			<ErrorText>{msg}</ErrorText>
+		</Center>
+	);
 };
 
 const Stats = ({ pillminder, token }: StatsProps) => {
@@ -124,12 +177,11 @@ const Stats = ({ pillminder, token }: StatsProps) => {
 		</HStack>
 	);
 
-	const emptyPillminderError = makeEmptyPillminderError(pillminder);
-	const makeEmptyPillminderErrorElement = emptyPillminderError ? (
-		<Center>
-			<ErrorText>{emptyPillminderError}</ErrorText>
-		</Center>
-	) : null;
+	const errorComponent = makeErrorComponent(
+		pillminder,
+		statsSummaryError,
+		takenDatesError
+	);
 
 	return (
 		<CardPage maxWidth="container.md">
@@ -138,9 +190,7 @@ const Stats = ({ pillminder, token }: StatsProps) => {
 					{getHeadingMsg(pillminder)}
 				</Heading>
 			</CardHeader>
-			<CardBody width="100%">
-				{makeEmptyPillminderErrorElement ?? statsBody}
-			</CardBody>
+			<CardBody width="100%">{errorComponent ?? statsBody}</CardBody>
 		</CardPage>
 	);
 };
