@@ -35,10 +35,10 @@ defmodule Pillminder.WebRouter.Plugs.Auth do
         halt_with_status(conn, 400)
 
       {:ok, token} ->
-        Logger.debug("Authorizing request to #{request_url(conn)} on pillminder #{timer_id}")
+        Logger.debug("Authorizing request to #{request_url(conn)} on timer_id #{timer_id}")
 
         authorized_conn = authorize(conn, token, timer_id)
-        Logger.debug("Authorized request to #{request_url(conn)} on pillminder #{timer_id}")
+        Logger.debug("Authorized request to #{request_url(conn)} on timer_id #{timer_id}")
 
         authorized_conn
     end
@@ -81,7 +81,7 @@ defmodule Pillminder.WebRouter.Plugs.Auth do
 
   @spec authorize(Plug.Conn.t(), String.t(), String.t()) :: Plug.Conn.t()
   defp authorize(conn, token, timer_id) do
-    if Pillminder.Auth.token_valid_for_pillminder?(token, timer_id) do
+    if Pillminder.Auth.token_valid_for_timer?(token, timer_id) do
       conn
     else
       halt_with_status(conn, 401)

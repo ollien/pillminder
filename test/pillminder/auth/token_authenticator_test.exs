@@ -40,7 +40,7 @@ defmodule PillminderTest.Auth.TokenAuthenticator do
     start_supervised!({TokenAuthenticator, server_opts: [name: @server_name]})
     :ok = TokenAuthenticator.put_token("1234", "test-pillminder", server_name: @server_name)
 
-    %{pillminder: "test-pillminder"} =
+    %{timer_id: "test-pillminder"} =
       TokenAuthenticator.token_data("1234", server_name: @server_name)
   end
 

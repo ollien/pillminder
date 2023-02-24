@@ -8,10 +8,10 @@ defmodule Pillminder.Auth.TokenAuthenticator do
   @type clock_source :: (() -> DateTime.t())
   @type token_data :: fixed_token_data() | dynamic_token_data()
   @type token_action :: :reject | :accept | :accept_and_delete
-  @type fixed_token_data :: %{expires_at: :never, pillminder: :all, token_type: :fixed}
+  @type fixed_token_data :: %{expires_at: :never, timer_id: :all, token_type: :fixed}
   @type dynamic_token_data :: %{
           expires_at: DateTime.t(),
-          pillminder: String.t(),
+          timer_id: String.t(),
           token_type: token_type()
         }
   @type token_type :: :single_use | :expiry_based | :fixed
@@ -71,11 +71,11 @@ defmodule Pillminder.Auth.TokenAuthenticator do
   """
   @spec put_token(String.t(), String.t(), server_name: GenServer.server()) ::
           :ok | {:error, any()}
-  def put_token(token, for_pillminder, opts \\ []) do
+  def put_token(token, for_timer_id, opts \\ []) do
     destination = Keyword.get(opts, :server_name, __MODULE__)
 
     Agent.get_and_update(destination, fn state ->
-      store_token(token, :expiry_based, for_pillminder, state)
+      store_token(token, :expiry_based, for_timer_id, state)
     end)
   end
 
@@ -84,11 +84,11 @@ defmodule Pillminder.Auth.TokenAuthenticator do
   """
   @spec put_single_use_token(String.t(), String.t(), server_name: GenServer.server()) ::
           :ok | {:error, any()}
-  def put_single_use_token(token, for_pillminder, opts \\ []) do
+  def put_single_use_token(token, for_timer_id, opts \\ []) do
     destination = Keyword.get(opts, :server_name, __MODULE__)
 
     Agent.get_and_update(destination, fn state ->
-      store_token(token, :single_use, for_pillminder, state)
+      store_token(token, :single_use, for_timer_id, state)
     end)
   end
 
@@ -177,9 +177,9 @@ defmodule Pillminder.Auth.TokenAuthenticator do
 
   @spec store_token(String.t(), :expiry_based | :single_use, String.t(), State.t()) ::
           {:ok | {:error, any()}, State.t()}
-  defp store_token(token, token_type, for_pillminder, state) do
+  defp store_token(token, token_type, for_timer_id, state) do
     token_data_res =
-      make_dynamic_token_data(state.clock_source, state.expiry_time, token_type, for_pillminder)
+      make_dynamic_token_data(state.clock_source, state.expiry_time, token_type, for_timer_id)
 
     case token_data_res do
       {:ok, token_data} ->
@@ -195,7 +195,7 @@ defmodule Pillminder.Auth.TokenAuthenticator do
 
   @spec make_fixed_token_data() :: fixed_token_data()
   defp make_fixed_token_data() do
-    %{expires_at: :never, pillminder: :all, token_type: :fixed}
+    %{expires_at: :never, timer_id: :all, token_type: :fixed}
   end
 
   @spec make_dynamic_token_data(
@@ -205,14 +205,14 @@ defmodule Pillminder.Auth.TokenAuthenticator do
           String.t()
         ) ::
           {:ok, token_data()} | {:error, any}
-  defp make_dynamic_token_data(clock_source, expiry_time, token_type, for_pillminder) do
+  defp make_dynamic_token_data(clock_source, expiry_time, token_type, for_timer_id) do
     now = clock_source.()
 
     case expiry_timestamp(now, expiry_time) do
       {:ok, expiry_timestamp} ->
         data = %{
           expires_at: expiry_timestamp,
-          pillminder: for_pillminder,
+          timer_id: for_timer_id,
           token_type: token_type
         }
 

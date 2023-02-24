@@ -4,22 +4,22 @@ defmodule PillminderTest.Auth do
   use ExUnit.Case, async: true
   doctest Pillminder.Auth
 
-  describe "token_valid_for_pillminder? with fixed token" do
+  describe "token_valid_for_timer? with fixed token" do
     setup do
       start_supervised!({Pillminder.Auth, fixed_tokens: ["1234"]})
       :ok
     end
 
-    test "allows fixed tokens for any pillminder" do
-      assert Auth.token_valid_for_pillminder?("1234", "sldkfjsdf")
-      assert Auth.token_valid_for_pillminder?("1234", "sowjnert80234fn")
-      assert Auth.token_valid_for_pillminder?("1234", "likdjflsdf")
+    test "allows fixed tokens for any timer" do
+      assert Auth.token_valid_for_timer?("1234", "sldkfjsdf")
+      assert Auth.token_valid_for_timer?("1234", "sowjnert80234fn")
+      assert Auth.token_valid_for_timer?("1234", "likdjflsdf")
     end
 
-    test "rejects unknown fixed tokens for any pillminder" do
-      assert not Auth.token_valid_for_pillminder?("1235", "sldkfjsdf")
-      assert not Auth.token_valid_for_pillminder?("1235", "1l23jklsdf")
-      assert not Auth.token_valid_for_pillminder?("1235", "sldkfjsdsdf")
+    test "rejects unknown fixed tokens for any timer" do
+      assert not Auth.token_valid_for_timer?("1235", "sldkfjsdf")
+      assert not Auth.token_valid_for_timer?("1235", "1l23jklsdf")
+      assert not Auth.token_valid_for_timer?("1235", "sldkfjsdsdf")
     end
   end
 
@@ -29,20 +29,20 @@ defmodule PillminderTest.Auth do
       :ok
     end
 
-    test "generating a token gives access to that pillminder" do
+    test "generating a token gives access to that timer" do
       {:ok, token} = Auth.make_token("test-pillminder")
-      assert Auth.token_valid_for_pillminder?(token, "test-pillminder")
+      assert Auth.token_valid_for_timer?(token, "test-pillminder")
     end
 
-    test "generating a token does not give access to other pillminder" do
+    test "generating a token does not give access to other timer" do
       {:ok, token} = Auth.make_token("test-pillminder")
-      assert not Auth.token_valid_for_pillminder?(token, "some-other-pillminder")
+      assert not Auth.token_valid_for_timer?(token, "some-other-pillminder")
     end
 
     test "allows access more than once" do
       {:ok, token} = Auth.make_token("test-pillminder")
-      assert Auth.token_valid_for_pillminder?(token, "test-pillminder")
-      assert Auth.token_valid_for_pillminder?(token, "test-pillminder")
+      assert Auth.token_valid_for_timer?(token, "test-pillminder")
+      assert Auth.token_valid_for_timer?(token, "test-pillminder")
     end
   end
 
@@ -52,18 +52,18 @@ defmodule PillminderTest.Auth do
       :ok
     end
 
-    test "access code can be exchanged for session token on that pillminder" do
+    test "access code can be exchanged for session token on that timer" do
       {:ok, access_code} = Auth.make_access_code("my-pillminder")
       {:ok, %{token: session_token}} = Auth.exchange_access_code(access_code)
 
-      assert Auth.token_valid_for_pillminder?(session_token, "my-pillminder")
+      assert Auth.token_valid_for_timer?(session_token, "my-pillminder")
     end
 
-    test "produced session token is not valid for another pillminder" do
+    test "produced session token is not valid for another timer" do
       {:ok, access_code} = Auth.make_access_code("my-pillminder")
       {:ok, %{token: session_token}} = Auth.exchange_access_code(access_code)
 
-      assert not Auth.token_valid_for_pillminder?(session_token, "some-other-pillminder")
+      assert not Auth.token_valid_for_timer?(session_token, "some-other-pillminder")
     end
 
     test "an invalid access code returns :invalid_access_code" do

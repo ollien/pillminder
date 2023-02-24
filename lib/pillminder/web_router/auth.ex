@@ -8,19 +8,19 @@ defmodule Pillminder.WebRouter.Auth do
   plug(:dispatch)
 
   post "/access-code" do
-    with {:ok, pillminder} <- body_value(conn, "pillminder"),
-         :ok <- pillminder_must_exist(pillminder),
-         {:ok, access_code} <- new_access_code(pillminder),
-         :ok <- send_access_code(pillminder, access_code) do
-      Logger.info("Created access code for pillminder #{pillminder}")
+    with {:ok, timer_id} <- body_value(conn, "pillminder"),
+         :ok <- timer_id_must_exist(timer_id),
+         {:ok, access_code} <- new_access_code(timer_id),
+         :ok <- send_access_code(timer_id, access_code) do
+      Logger.info("Created access code for timer #{timer_id}")
       send_resp(conn, 204, "")
     else
       {:error, {:missing_in_body, _key}} ->
-        Logger.debug("No pillminder found in request")
+        Logger.debug("No pillminder/timer_id found in request")
 
-      {:error, {:no_such_pillminder, pillminder}} ->
-        Logger.debug("Pillminder #{pillminder} not found")
-        send_resp(conn, 400, Poison.encode!(%{error: "Invalid pillminder"}))
+      {:error, {:no_such_timer, timer_id}} ->
+        Logger.debug("Pillminder #{timer_id} not found")
+        send_resp(conn, 400, Poison.encode!(%{error: "Invalid timer_id"}))
 
       {:error, {:make_access_code, reason}} ->
         # I would log the pillminder here but it isn't defined at this point...
@@ -42,9 +42,9 @@ defmodule Pillminder.WebRouter.Auth do
   post "/token" do
     with {:ok, access_code} <- body_value(conn, "access_code"),
          {:ok, access_code_info} <- exchange_access_code(access_code) do
-      Logger.info("Created token for pillminder #{access_code_info.pillminder}")
+      Logger.info("Created token for timer id #{access_code_info.timer_id}")
 
-      response_data = %{pillminder: access_code_info.pillminder, token: access_code_info.token}
+      response_data = %{pillminder: access_code_info.timer_id, token: access_code_info.token}
 
       send_resp(
         conn,
@@ -60,7 +60,7 @@ defmodule Pillminder.WebRouter.Auth do
         send_resp(conn, 400, Poison.encode!(%{error: "Invalid access code"}))
 
       {:error, {:exchange_token, reason}} ->
-        # I would log the pillminder here but it isn't defined at this point...
+        # I would log the timer_id here but it isn't defined at this point...
         Logger.error("Failed to exchange access code: #{reason}")
         send_resp(conn, 500, "")
     end
@@ -71,22 +71,22 @@ defmodule Pillminder.WebRouter.Auth do
   defp body_value(conn, key) do
     case Map.get(conn.body_params, key) do
       nil -> {:error, {:missing_in_body, key}}
-      pillminder -> {:ok, pillminder}
+      timer_id -> {:ok, timer_id}
     end
   end
 
-  @spec pillminder_must_exist(String.t()) :: :ok | {:error, {:no_such_pillminder, String.t()}}
-  defp pillminder_must_exist(pillminder) do
-    case Pillminder.lookup_timer(pillminder) do
-      nil -> {:error, {:no_such_pillminder, pillminder}}
+  @spec timer_id_must_exist(String.t()) :: :ok | {:error, {:no_such_timer, String.t()}}
+  defp timer_id_must_exist(timer_id) do
+    case Pillminder.lookup_timer(timer_id) do
+      nil -> {:error, {:no_such_timer, timer_id}}
       _ -> :ok
     end
   end
 
   @spec new_access_code(String.t()) ::
           {:ok, String.t()} | {:error, {:make_access_code, String.t()}}
-  defp new_access_code(pillminder) do
-    case Pillminder.Auth.make_access_code(pillminder) do
+  defp new_access_code(timer_id) do
+    case Pillminder.Auth.make_access_code(timer_id) do
       {:ok, access_code} -> {:ok, access_code}
       {:error, reason} -> {:error, {:make_access_code, reason}}
     end
@@ -94,10 +94,10 @@ defmodule Pillminder.WebRouter.Auth do
 
   @spec send_access_code(String.t(), String.t()) ::
           :ok | {:error, {:send_access_code, {:no_such_timer, String.t()} | any()}}
-  defp send_access_code(pillminder, access_code) do
-    case Pillminder.Notifications.send_access_code_notification(pillminder, access_code) do
+  defp send_access_code(timer_id, access_code) do
+    case Pillminder.Notifications.send_access_code_notification(timer_id, access_code) do
       :ok -> :ok
-      {:error, :no_such_timer} -> {:error, {:send_access_code, {:no_such_timer, pillminder}}}
+      {:error, :no_such_timer} -> {:error, {:send_access_code, {:no_such_timer, timer_id}}}
       {:error, reason} -> {:error, {:send_access_code, reason}}
     end
   end
