@@ -87,14 +87,14 @@ defmodule Pillminder.WebRouter.Stats do
   end
 
   @spec taken_dates(String.t(), Date.t()) ::
-          {:ok, %{String.t() => boolean()}} | {:error, {:taken_dates, any()}}
+          {:ok, [%{String.t() => any()}]} | {:error, {:taken_dates, any()}}
   defp taken_dates(timer_id, today) do
     case Stats.taken_dates(timer_id, today) do
       {:ok, taken_dates} ->
         iso_taken_log =
           taken_dates
-          |> Enum.map(fn {date, taken} -> {Date.to_iso8601(date), taken} end)
-          |> Map.new()
+          |> Enum.sort_by(fn {date, _taken} -> date end)
+          |> Enum.map(fn {date, taken} -> %{date: Date.to_iso8601(date), taken: taken} end)
 
         {:ok, iso_taken_log}
 

@@ -1,3 +1,4 @@
+import joi from "joi";
 import { DateTime } from "luxon";
 
 const INVALID_TOKEN_ERROR = "Your session has expired. Please log in again";
@@ -63,6 +64,11 @@ export async function requestAccessCode(pillminder: string): Promise<void> {
 export async function exchangeAccessCode(
 	accessCode: string
 ): Promise<TokenInformation> {
+	const schema = joi.object({
+		token: joi.string(),
+		pillminder: joi.string(),
+	});
+
 	const res = await fetch("/auth/token", {
 		method: "POST",
 		body: JSON.stringify({ access_code: accessCode }),
@@ -77,7 +83,10 @@ export async function exchangeAccessCode(
 		throw new Error("Failed to validate access code");
 	}
 
-	return res.json();
+	const jsonRes = res.json();
+	assertValidResponse(jsonRes, schema);
+
+	return jsonRes;
 }
 
 /**
@@ -91,6 +100,11 @@ export async function getStatsSummary(
 	token: string,
 	pillminder: string
 ): Promise<StatsSummary> {
+	const schema = joi.object({
+		streak_length: joi.number(),
+		last_taken_on: joi.string(),
+	});
+
 	const res = await fetch(`/stats/${encodeURIComponent(pillminder)}/summary`, {
 		headers: { Authorization: `Token ${token}` },
 	});
@@ -103,6 +117,7 @@ export async function getStatsSummary(
 	}
 
 	const resJson = await res.json();
+	assertValidResponse(resJson, schema);
 
 	return {
 		streakLength: resJson.streak_length,
@@ -120,6 +135,12 @@ export async function getTakenDates(
 	token: string,
 	pillminder: string
 ): Promise<TakenDate[]> {
+	const schema = joi.object({
+		taken_dates: joi
+			.array()
+			.items(joi.object({ date: joi.string(), taken: joi.boolean() })),
+	});
+
 	const res = await fetch(`/stats/${encodeURIComponent(pillminder)}/history`, {
 		headers: { Authorization: `Token ${token}` },
 	});
@@ -131,14 +152,12 @@ export async function getTakenDates(
 	}
 
 	const resJson = await res.json();
-	const sentTakenDates: Record<string, boolean> | undefined =
-		resJson.taken_dates;
-	if (sentTakenDates === undefined) {
-		// This is a defensive assertion on the response
-		throw new Error("Invalid stats log returned from server");
-	}
+	assertValidResponse(resJson, schema);
 
-	return Object.entries(sentTakenDates).map(([rawDate, taken]) => ({
+	const sentTakenDates: { date: string; taken: boolean }[] =
+		resJson.taken_dates;
+
+	return sentTakenDates.map(({ date: rawDate, taken }) => ({
 		taken,
 		date: parseDate(rawDate),
 	}));
@@ -157,4 +176,11 @@ function parseDate(date: string | null): DateTime | null {
 	}
 
 	return parsed;
+}
+
+function assertValidResponse(data: unknown, schema: joi.Schema) {
+	const validationResult = schema.validate(data);
+	if (validationResult.error) {
+		throw new Error("Invalid data from server");
+	}
 }
