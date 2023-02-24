@@ -12,14 +12,14 @@ defmodule Pillminder.Config do
     Enum.map(timers, &load_timer!/1)
   end
 
-  @spec load_timer!(map()) :: Pillminder.Config.Timer
+  @spec load_timer!(keyword()) :: Pillminder.Config.Timer
   defp load_timer!(config_timer) do
     conform!(
       %Pillminder.Config.Timer{
         id: config_timer[:id],
         reminder_spacing: config_timer[:reminder_spacing] * 1000,
         reminder_start_time: config_timer[:reminder_start_time],
-        reminder_start_time_fudge: config_timer[:reminder_start_time_fudge],
+        reminder_start_time_fudge: Keyword.get(config_timer, :reminder_start_time_fudge, 0),
         ntfy_topic: config_timer[:ntfy_topic]
       },
       Pillminder.Config.Timer.s()
