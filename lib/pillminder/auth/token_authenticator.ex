@@ -79,6 +79,14 @@ defmodule Pillminder.Auth.TokenAuthenticator do
     end)
   end
 
+  def clean_expired_tokens(opts \\ []) do
+    destination = Keyword.get(opts, :server_name, __MODULE__)
+
+    Agent.update(destination, fn state ->
+      clean_tokens(state)
+    end)
+  end
+
   @doc """
   Add a token to the cache, but it will only be able to be used once.
   """
@@ -168,11 +176,20 @@ defmodule Pillminder.Auth.TokenAuthenticator do
        ) do
     now = clock_source.()
 
-    if Timex.before?(now, expires_at) do
-      :accept
-    else
+    if expired?(now, expires_at) do
       :reject
+    else
+      :accept
     end
+  end
+
+  @spec expired?(DateTime.t(), DateTime.t() | :never) :: boolean()
+  defp expired?(_now, :never) do
+    false
+  end
+
+  defp expired?(now, expires_at) do
+    Timex.after?(now, expires_at)
   end
 
   @spec store_token(String.t(), :expiry_based | :single_use, String.t(), State.t()) ::
@@ -227,5 +244,19 @@ defmodule Pillminder.Auth.TokenAuthenticator do
           {:ok, DateTime.t()} | {:error, any()}
   defp expiry_timestamp(now, expiry_time) do
     Timex.add(now, expiry_time) |> Util.Error.ok_or()
+  end
+
+  @spec clean_tokens(State.t()) :: State.t()
+  defp clean_tokens(state) do
+    now = state.clock_source.()
+
+    Map.update!(state, :tokens, fn tokens ->
+      tokens
+      |> Enum.reject(fn {_token, %{expires_at: expires_at}} ->
+        IO.puts("#{inspect(now)} #{inspect(expires_at)}")
+        expired?(now, expires_at)
+      end)
+      |> Map.new()
+    end)
   end
 end

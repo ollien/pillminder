@@ -2,12 +2,16 @@ defmodule Pillminder.Auth do
   @moduledoc """
   Auth handles token management for authenticating requests when accessing pillminders/timers.
   """
+  require Logger
 
   alias Pillminder.Auth.TokenAuthenticator
+  alias Pillminder.Auth.Cleaner
   use Supervisor
 
   @access_code_length 6
   @session_token_length 64
+  @cleanup_interval Timex.Duration.from_minutes(60)
+
   @access_code_server_name __MODULE__.AccessTokenAuthenticator
   @session_token_server_name __MODULE__.SessionTokenAuthenticator
 
@@ -21,9 +25,15 @@ defmodule Pillminder.Auth do
 
   @impl true
   def init(opts) do
+    children = authenticator_children(opts) ++ [Cleaner]
+
+    Supervisor.init(children, strategy: :one_for_one)
+  end
+
+  defp authenticator_children(opts \\ []) do
     fixed_tokens = Keyword.get(opts, :fixed_tokens, [])
 
-    children = [
+    [
       Supervisor.child_spec(
         {TokenAuthenticator,
          fixed_tokens: fixed_tokens, server_opts: [name: @session_token_server_name]},
@@ -33,8 +43,6 @@ defmodule Pillminder.Auth do
         id: @access_code_server_name
       )
     ]
-
-    Supervisor.init(children, strategy: :one_for_one)
   end
 
   @doc """
@@ -89,6 +97,24 @@ defmodule Pillminder.Auth do
     else
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  @doc """
+  Clean expired tokens in this server.
+  """
+  @spec clean_expired_tokens() :: :ok
+  def clean_expired_tokens() do
+    authenticator_children()
+    |> Enum.map(fn %{start: {TokenAuthenticator, _function, [opts]}} ->
+      case get_in(opts, [:server_opts, :name]) do
+        nil -> TokenAuthenticator
+        server_name -> server_name
+      end
+    end)
+    |> Enum.each(fn server_name ->
+      Logger.info("Running cleanup job for TokenAuthenticator server #{server_name}")
+      TokenAuthenticator.clean_expired_tokens(server_name: server_name)
+    end)
   end
 
   @spec access_code_data(String.t()) ::
