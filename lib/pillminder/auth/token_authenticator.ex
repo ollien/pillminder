@@ -27,7 +27,7 @@ defmodule Pillminder.Auth.TokenAuthenticator do
 
     defstruct tokens: %{},
               clock_source: &Util.Time.now!/0,
-              expiry_time: Timex.Duration.from_minutes(10)
+              expiry_time: Timex.Duration.from_minutes(30)
 
     @type t() :: %__MODULE__{
             tokens: %{String.t() => TokenAuthenticator.dynamic_token_data()},
