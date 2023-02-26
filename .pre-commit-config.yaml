@@ -1,8 +1,12 @@
 repos:
-  - repo: https://gitlab.com/jvenom/elixir-pre-commit-hooks
-    rev: v1.0.0
+  - repo: local
     hooks:
       - id: mix-format
+        name: mix format
+        description: Formats Elixir files with mix format.
+        language: system
+        entry: bash -c "cd app && mix format"
+        files: \.exs?$
   - repo: local
     hooks:
       - id: npm-lint
