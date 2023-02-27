@@ -70,9 +70,21 @@ defmodule Pillminder.Application do
         ),
       scheduled_func: fn ->
         # The task supervisor in the Scheduler should re-run this, so it's ok to assert
+        # We want to make sure that we don't have two timers going at once, so we cancel an existing one, if there is.
+        # (this would be possible if a day was missed)
+        :ok = cancel_if_exists(timer)
         :ok = Pillminder.send_reminder_for_timer(timer)
         Logger.info("Kicked off reminder for timer starting at #{timer.reminder_start_time}")
       end
     }
+  end
+
+  @spec cancel_if_exists(Config.Timer.t()) :: :ok | {:error, any()}
+  defp cancel_if_exists(timer) do
+    case ReminderSender.dismiss(timer.id) do
+      :ok -> :ok
+      {:error, :not_timing} -> :ok
+      err = {:error, _reason} -> err
+    end
   end
 end

@@ -10,7 +10,6 @@ defmodule Pillminder.Auth do
 
   @access_code_length 6
   @session_token_length 64
-  @cleanup_interval Timex.Duration.from_minutes(60)
 
   @access_code_server_name __MODULE__.AccessTokenAuthenticator
   @session_token_server_name __MODULE__.SessionTokenAuthenticator

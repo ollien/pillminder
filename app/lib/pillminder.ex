@@ -2,7 +2,7 @@ defmodule Pillminder do
   alias Pillminder.ReminderSender
   alias Pillminder.Config
 
-  @spec send_reminder_for_timer(Config.Timer) :: :ok | {:error, any}
+  @spec send_reminder_for_timer(Config.Timer.t()) :: :ok | {:error, any}
   def send_reminder_for_timer(timer) do
     ReminderSender.send_reminder_on_interval(
       timer.id,

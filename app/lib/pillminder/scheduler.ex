@@ -126,9 +126,14 @@ defmodule Pillminder.Scheduler do
     func_task = Task.Supervisor.async_nolink(supervisor, reminder.scheduled_func)
     # TODO: Should we pick a timeout here?
     case Task.yield(func_task, :infinity) do
-      {:ok, _} -> Logger.debug("Reminder task completed")
-      {:exit, :normal} -> Logger.debug("Reminder task completed")
-      {:exit, reason} -> Logger.error("Reminder task failed: #{inspect(reason)}")
+      {:ok, _} ->
+        Logger.debug("Reminder task for \"#{reminder.id}\" completed")
+
+      {:exit, :normal} ->
+        Logger.debug("Reminder task for \"#{reminder.id}\"completed")
+
+      {:exit, reason} ->
+        Logger.error("Reminder task for \"#{reminder.id}\" failed: #{inspect(reason)}")
     end
 
     nil
