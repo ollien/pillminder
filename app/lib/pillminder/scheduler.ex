@@ -15,6 +15,8 @@ defmodule Pillminder.Scheduler do
 
   @spec start_link({[ScheduledReminder.t()], init_options()}) :: {:ok, pid}
   def start_link({reminders, opts}) do
+    # TODO: Looking at this with fresh eyes (this was one of the first parts of this project), I want to restructure this
+    # so that the scheduler is the task supervisor, and we push onto it, rather than threading it through like this
     {:ok, supervisor} = Task.Supervisor.start_link()
     Task.start(__MODULE__, :schedule_reminders, [reminders, supervisor, opts])
   end
