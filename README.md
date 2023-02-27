@@ -48,10 +48,10 @@ services:
     volumes:
       - /path/to/your/data/directory:/var/lib/pillminder
       - /path/to/your/config/directory:/etc/pillminder
+  web:
+    ports:
+      - "8080:80"
 ```
-
-By default, the web server listens on port 8000, but this can also be
-overridden within the `docker-compose.override.yml` if desired.
 
 You can start the application with `docker compose up` (if a rebuild is required, run `docker compose build`)
 
