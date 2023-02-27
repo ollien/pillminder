@@ -102,7 +102,7 @@ export async function getStatsSummary(
 ): Promise<StatsSummary> {
 	const schema = joi.object({
 		streak_length: joi.number(),
-		last_taken_on: joi.string(),
+		last_taken_on: joi.string().allow(null),
 	});
 
 	const res = await fetch(
