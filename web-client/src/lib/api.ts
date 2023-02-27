@@ -32,7 +32,7 @@ export interface TokenInformation {
  *          nothing can be assumed.
  */
 export async function requestAccessCode(pillminder: string): Promise<void> {
-	const res = await fetch("/auth/access-code", {
+	const res = await fetch("/api/v1/auth/access-code", {
 		method: "POST",
 		body: JSON.stringify({ pillminder }),
 		headers: {
@@ -69,7 +69,7 @@ export async function exchangeAccessCode(
 		pillminder: joi.string(),
 	});
 
-	const res = await fetch("/auth/token", {
+	const res = await fetch("/api/v1/auth/token", {
 		method: "POST",
 		body: JSON.stringify({ access_code: accessCode }),
 		headers: {
@@ -105,9 +105,12 @@ export async function getStatsSummary(
 		last_taken_on: joi.string(),
 	});
 
-	const res = await fetch(`/stats/${encodeURIComponent(pillminder)}/summary`, {
-		headers: { Authorization: `Token ${token}` },
-	});
+	const res = await fetch(
+		`/api/v1/stats/${encodeURIComponent(pillminder)}/summary`,
+		{
+			headers: { Authorization: `Token ${token}` },
+		}
+	);
 
 	if (res.status === 401) {
 		throw new Error(INVALID_TOKEN_ERROR);
@@ -141,9 +144,12 @@ export async function getTakenDates(
 			.items(joi.object({ date: joi.string(), taken: joi.boolean() })),
 	});
 
-	const res = await fetch(`/stats/${encodeURIComponent(pillminder)}/history`, {
-		headers: { Authorization: `Token ${token}` },
-	});
+	const res = await fetch(
+		`/api/v1/stats/${encodeURIComponent(pillminder)}/history`,
+		{
+			headers: { Authorization: `Token ${token}` },
+		}
+	);
 
 	if (res.status === 401) {
 		throw new Error(INVALID_TOKEN_ERROR);

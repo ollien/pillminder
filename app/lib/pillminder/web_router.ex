@@ -36,9 +36,9 @@ defmodule Pillminder.WebRouter do
   plug(:match)
   plug(:dispatch)
 
-  forward("/auth", to: __MODULE__.Auth)
-  forward("/timer", to: __MODULE__.Timer)
-  forward("/stats", to: __MODULE__.Stats)
+  forward("/api/v1/auth", to: __MODULE__.Auth)
+  forward("/api/v1/timer", to: __MODULE__.Timer)
+  forward("/api/v1/stats", to: __MODULE__.Stats)
 
   match _ do
     send_resp(conn, 404, "")

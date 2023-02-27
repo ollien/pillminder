@@ -28,7 +28,7 @@ pillminder-*.tar
 /app/tmp/
 
 /.vscode
-/pillminder.db
+pillminder.db*
 
 # Web Client
 

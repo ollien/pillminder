@@ -76,7 +76,7 @@ defmodule Pillminder.Notifications do
           action: "http",
           label: "Mark taken",
           clear: true,
-          url: URI.merge(Pillminder.get_base_url(), "/timer/#{URI.encode(timer.id)}"),
+          url: URI.merge(Pillminder.get_base_url(), "/api/v1/timer/#{URI.encode(timer.id)}"),
           method: "DELETE",
           headers: token_headers
         },
@@ -84,7 +84,8 @@ defmodule Pillminder.Notifications do
           action: "http",
           label: "Snooze 1hr",
           clear: true,
-          url: URI.merge(Pillminder.get_base_url(), "/timer/#{URI.encode(timer.id)}/snooze"),
+          url:
+            URI.merge(Pillminder.get_base_url(), "/api/v1/timer/#{URI.encode(timer.id)}/snooze"),
           method: "POST",
           headers: token_headers
         }

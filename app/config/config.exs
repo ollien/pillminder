@@ -3,8 +3,6 @@ import Config
 config :pillminder,
   ecto_repos: [Pillminder.Stats.Repo]
 
-config :pillminder, Pillminder.Stats.Repo, database: "./pillminder.db"
-
 config :pillminder, Pillminder.Auth.Cleaner,
   jobs: [
     {"@hourly", {Pillminder.Auth, :clean_expired_tokens, []}}

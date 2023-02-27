@@ -8,7 +8,14 @@ defmodule Pillminder.MixProject do
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      aliases: aliases()
+      aliases: aliases(),
+      releases: [
+        prod: [
+          config_providers: [
+            {Config.Reader, "/etc/pillminder/config.exs"}
+          ]
+        ]
+      ]
     ]
   end
 

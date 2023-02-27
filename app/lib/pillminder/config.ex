@@ -7,7 +7,7 @@ defmodule Pillminder.Config do
   """
   @spec load_timers_from_env!() :: [Pillminder.Config.Timer]
   def load_timers_from_env!() do
-    timers = Application.get_env(:pillminder, :timers)
+    timers = Application.fetch_env!(:pillminder, :timers)
 
     Enum.map(timers, &load_timer!/1)
   end
