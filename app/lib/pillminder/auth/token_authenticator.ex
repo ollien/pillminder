@@ -253,7 +253,6 @@ defmodule Pillminder.Auth.TokenAuthenticator do
     Map.update!(state, :tokens, fn tokens ->
       tokens
       |> Enum.reject(fn {_token, %{expires_at: expires_at}} ->
-        IO.puts("#{inspect(now)} #{inspect(expires_at)}")
         expired?(now, expires_at)
       end)
       |> Map.new()
