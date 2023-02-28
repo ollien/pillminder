@@ -68,6 +68,7 @@ defmodule Pillminder.Application do
           timer.reminder_start_time,
           timer.reminder_start_time_fudge
         ),
+      time_zone: timer.reminder_time_zone,
       scheduled_func: fn ->
         # The task supervisor in the Scheduler should re-run this, so it's ok to assert
         # We want to make sure that we don't have two timers going at once, so we cancel an existing one, if there is.

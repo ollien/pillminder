@@ -28,7 +28,7 @@ defmodule Pillminder.Scheduler do
       {Task, fn -> schedule_reminders(reminders, opts) end}
     ]
 
-    Supervisor.init(children, strategy: :one_for_one)
+    Supervisor.init(children, strategy: :one_for_all)
   end
 
   @doc """
@@ -37,32 +37,21 @@ defmodule Pillminder.Scheduler do
   """
   @spec schedule_reminders([ScheduledReminder.t()], init_options()) :: :ok
   def schedule_reminders(reminders, opts \\ []) do
-    clock_source = Keyword.get(opts, :clock_source, &Util.Time.now!/0)
-    now = clock_source.()
-    {:ok, to_schedule} = get_next_scheduleable_times(reminders, now)
+    maybe_clock_source = Keyword.get(opts, :clock_source)
 
-    Enum.each(to_schedule, fn {reminder, schedule_time} ->
-      {:ok, ms_until} = get_ms_until(now, schedule_time)
-      schedule_reminder(reminder, ms_until, clock_source)
-    end)
-  end
-
-  @spec get_next_scheduleable_times(reminders :: [ScheduledReminder.t()], now :: DateTime.t()) ::
-          {:ok, [{ScheduledReminder.t(), DateTime.t()}]} | {:error, String.t()}
-  defp get_next_scheduleable_times(reminders, now) do
-    Enum.reverse(reminders)
-    |> Enum.reduce_while([], fn reminder, acc ->
-      case get_next_scheduleable_time(reminder, now) do
-        {:ok, reminder_time} ->
-          {:cont, [{reminder, reminder_time} | acc]}
-
-        {:error, err} ->
-          err_msg = ~s(Failed to determine next time for reminder "#{reminder.id}": #{err})
-
-          {:halt, {:error, err_msg}}
+    Enum.each(reminders, fn reminder ->
+      reminder_clock_source = fn ->
+        case maybe_clock_source do
+          nil -> Util.Time.now!(reminder.time_zone)
+          clock_source -> clock_source.()
+        end
       end
+
+      now = reminder_clock_source.()
+      {:ok, schedule_time} = get_next_scheduleable_time(reminder, now)
+      {:ok, ms_until} = get_ms_until(now, schedule_time)
+      schedule_reminder(reminder, ms_until, reminder_clock_source)
     end)
-    |> Util.Error.ok_or()
   end
 
   @spec get_next_scheduleable_time(reminder :: ScheduledReminder.t(), now :: DateTime.t()) ::

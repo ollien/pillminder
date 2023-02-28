@@ -2,11 +2,11 @@ defmodule Pillminder.Util.Time do
   alias Pillminder.Util
 
   @doc """
-  Get the current local time, or raise an exception if that fails.
+  Get the current  time, or raise an exception if that fails.
   """
-  @spec now!() :: DateTime.t()
-  def now!() do
-    case Timex.local() |> Util.Error.ok_or() do
+  @spec now!(Timex.Types.valid_timezone()) :: DateTime.t()
+  def now!(tz \\ :local) do
+    case Timex.now(tz) |> Util.Error.ok_or() do
       {:ok, now} -> now
       {:error, reason} -> raise "Could not get current time: #{reason}"
     end
