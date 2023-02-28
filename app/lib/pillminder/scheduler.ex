@@ -1,6 +1,6 @@
 defmodule Pillminder.Scheduler do
   @moduledoc """
-  The Scheduler is a Task that will kick off setting up daily reminders to take medication. Every day,
+  The Scheduler kicks off setting up daily reminders to take medication. Every day,
   a single call is made to the given `scheduled_func` in a `ScheduledReminder`
   """
 
@@ -8,32 +8,42 @@ defmodule Pillminder.Scheduler do
 
   alias Pillminder.Scheduler.ScheduledReminder
   alias Pillminder.Util
-  use Task
+  use Supervisor
 
   @type clock_source :: (() -> DateTime.t())
   @type init_options :: [clock_source: clock_source()]
 
-  @spec start_link({[ScheduledReminder.t()], init_options()}) :: {:ok, pid}
+  @task_supervisor_name __MODULE__.TaskSupervisor
+
+  @spec start_link({[ScheduledReminder.t()], init_options()}) ::
+          {:ok, pid} | {:error, any} | :ignore
   def start_link({reminders, opts}) do
-    # TODO: Looking at this with fresh eyes (this was one of the first parts of this project), I want to restructure this
-    # so that the scheduler is the task supervisor, and we push onto it, rather than threading it through like this
-    {:ok, supervisor} = Task.Supervisor.start_link()
-    Task.start(__MODULE__, :schedule_reminders, [reminders, supervisor, opts])
+    Supervisor.start_link(__MODULE__, {reminders, opts}, name: __MODULE__)
+  end
+
+  @impl true
+  def init({reminders, opts}) do
+    children = [
+      {Task.Supervisor, name: @task_supervisor_name},
+      {Task, fn -> schedule_reminders(reminders, opts) end}
+    ]
+
+    Supervisor.init(children, strategy: :one_for_one)
   end
 
   @doc """
     Schedule reminders to be run at the time indicated by their start time. These reminders will run to completion,
     and then be rescheduled for the given time.
   """
-  @spec schedule_reminders([ScheduledReminder.t()], pid, init_options()) :: :ok
-  def schedule_reminders(reminders, supervisor, opts \\ []) do
+  @spec schedule_reminders([ScheduledReminder.t()], init_options()) :: :ok
+  def schedule_reminders(reminders, opts \\ []) do
     clock_source = Keyword.get(opts, :clock_source, &Util.Time.now!/0)
     now = clock_source.()
     {:ok, to_schedule} = get_next_scheduleable_times(reminders, now)
 
     Enum.each(to_schedule, fn {reminder, schedule_time} ->
       {:ok, ms_until} = get_ms_until(now, schedule_time)
-      schedule_reminder(supervisor, reminder, ms_until, clock_source)
+      schedule_reminder(reminder, ms_until, clock_source)
     end)
   end
 
@@ -78,12 +88,11 @@ defmodule Pillminder.Scheduler do
   end
 
   @spec schedule_reminder(
-          pid,
           ScheduledReminder.t(),
           non_neg_integer(),
           clock_source()
         ) :: :ok
-  defp schedule_reminder(supervisor, reminder, ms_until, clock_source) do
+  defp schedule_reminder(reminder, ms_until, clock_source) do
     log_reminder_schedule(reminder, ms_until, clock_source)
 
     {:ok, _} =
@@ -92,7 +101,7 @@ defmodule Pillminder.Scheduler do
         :erlang,
         :apply,
         # We must use :erlang.apply if we want to use a private function here
-        [fn -> run_and_reschedule(supervisor, reminder, clock_source) end, []]
+        [fn -> run_and_reschedule(reminder, clock_source) end, []]
       )
 
     :ok
@@ -118,14 +127,15 @@ defmodule Pillminder.Scheduler do
     )
   end
 
-  @spec run_and_reschedule(pid, ScheduledReminder.t(), clock_source()) :: nil
-  defp run_and_reschedule(supervisor, reminder, clock_source) do
-    run_reminder_task(supervisor, reminder)
-    run_reschedule_task(supervisor, reminder, clock_source)
+  @spec run_and_reschedule(ScheduledReminder.t(), clock_source()) :: nil
+  defp run_and_reschedule(reminder, clock_source) do
+    run_reminder_task(reminder)
+    run_reschedule_task(reminder, clock_source)
   end
 
-  defp run_reminder_task(supervisor, reminder) do
-    func_task = Task.Supervisor.async_nolink(supervisor, reminder.scheduled_func)
+  @spec run_reminder_task(ScheduledReminder.t()) :: nil
+  defp run_reminder_task(reminder) do
+    func_task = Task.Supervisor.async_nolink(@task_supervisor_name, reminder.scheduled_func)
     # TODO: Should we pick a timeout here?
     case Task.yield(func_task, :infinity) do
       {:ok, _} ->
@@ -141,19 +151,23 @@ defmodule Pillminder.Scheduler do
     nil
   end
 
-  defp run_reschedule_task(supervisor, reminder, clock_source) do
-    # The only other possible return values for this are :ignore and :already_started, neither of which
-    # can happen here.
+  @spec run_reschedule_task(ScheduledReminder.t(), clock_source()) :: nil
+  defp run_reschedule_task(reminder, clock_source) do
+    # GenRetry.Task.Supervisor.async_nolink doesn't accept a name, so we must emulate it
     reschedule_task =
-      GenRetry.Task.Supervisor.async_nolink(
-        supervisor,
-        fn -> reschedule_reminder(supervisor, reminder, clock_source) end,
-        # We _REALLY_ want this to be scheduled; failure isn't quite an option.
-        retries: :infinity,
-        # ... but we probably don't want exponential backoff in that case.
-        exp_base: 1
+      Task.Supervisor.async_nolink(
+        @task_supervisor_name,
+        GenRetry.Task.task_function(
+          fn -> reschedule_reminder(reminder, clock_source) end,
+          # We _REALLY_ want this to be scheduled; failure isn't quite an option.
+          retries: :infinity,
+          # ... but we probably don't want exponential backoff in that case.
+          exp_base: 1
+        )
       )
 
+    # The only other possible return values for this are :ignore and :already_started, neither of which
+    # can happen here.
     case Task.yield(reschedule_task, :infinity) do
       {:ok, _} -> :ok
       {:exit, :normal} -> :ok
@@ -164,11 +178,11 @@ defmodule Pillminder.Scheduler do
     nil
   end
 
-  @spec reschedule_reminder(pid, ScheduledReminder.t(), clock_source()) :: :ok
-  defp reschedule_reminder(supervisor, reminder, clock_source) do
+  @spec reschedule_reminder(ScheduledReminder.t(), clock_source()) :: :ok
+  defp reschedule_reminder(reminder, clock_source) do
     now = clock_source.()
     {:ok, schedule_time} = get_next_scheduleable_time(reminder, now)
     {:ok, ms_until} = get_ms_until(now, schedule_time)
-    schedule_reminder(supervisor, reminder, ms_until, clock_source)
+    schedule_reminder(reminder, ms_until, clock_source)
   end
 end
