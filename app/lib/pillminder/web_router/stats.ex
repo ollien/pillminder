@@ -93,7 +93,7 @@ defmodule Pillminder.WebRouter.Stats do
       {:ok, taken_dates} ->
         iso_taken_log =
           taken_dates
-          |> Enum.sort_by(fn {date, _taken} -> date end)
+          |> Enum.sort_by(fn {date, _taken} -> date end, Date)
           |> Enum.map(fn {date, taken} -> %{date: Date.to_iso8601(date), taken: taken} end)
 
         {:ok, iso_taken_log}
