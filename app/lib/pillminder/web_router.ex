@@ -11,7 +11,7 @@ defmodule Pillminder.WebRouter do
       at: "/app",
       # Technically this should be part of the OTP release, but this is a development server so I don't
       # _really_ care.
-      from: "./web-client/dist/"
+      from: "../web-client/dist/"
     )
   end
 
