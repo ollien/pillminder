@@ -216,7 +216,9 @@ defmodule Pillminder.Stats do
     # gets converted to a string for some reason.
     |> Ecto.Query.select([entry], %{taken_at: entry.taken_at})
     # Either it will be the last entry (indicating a nil gap), or there will be a space between two days
-    |> Ecto.Query.where([entry], is_nil(entry.gap) or entry.gap > 1)
+    # (a space in the interval [0, 2) is acceptable though, as we may have just taken it a bit late on the next day,
+    # making it, for instance, 1.5 days apart, which is fine)
+    |> Ecto.Query.where([entry], is_nil(entry.gap) or entry.gap >= 2)
     |> Ecto.Query.limit(1)
     |> Repo.one()
     |> case do
