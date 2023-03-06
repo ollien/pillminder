@@ -1,6 +1,7 @@
 defmodule Pillminder.WebRouter.Stats do
   require Logger
 
+  alias Pillminder.Config
   alias Pillminder.Stats
   alias Pillminder.Util
   alias Pillminder.WebRouter.Plugs
@@ -12,7 +13,8 @@ defmodule Pillminder.WebRouter.Stats do
   plug(:dispatch)
 
   get "/:timer_id/summary" do
-    with {:ok, today} <- get_date(),
+    with {:ok, tz} <- get_tz_for_timer(timer_id),
+         {:ok, today} <- get_date(tz),
          {:ok, streak_length} <- streak_length(timer_id, today),
          {:ok, last_taken_on} <- last_taken_on(timer_id) do
       send_resp(
@@ -25,12 +27,18 @@ defmodule Pillminder.WebRouter.Stats do
         |> Poison.encode!()
       )
     else
-      {:error, _reason} -> send_resp(conn, 500, "")
+      {:error, :no_such_timer} ->
+        msg = ~s(No timer with id "#{timer_id}")
+        send_resp(conn, 404, %{error: msg} |> Poison.encode!())
+
+      {:error, _reason} ->
+        send_resp(conn, 500, "")
     end
   end
 
   get "/:timer_id/history" do
-    with {:ok, today} <- get_date(),
+    with {:ok, tz} <- get_tz_for_timer(timer_id),
+         {:ok, today} <- get_date(tz),
          {:ok, taken_log} <- taken_dates(timer_id, today) do
       send_resp(
         conn,
@@ -38,6 +46,10 @@ defmodule Pillminder.WebRouter.Stats do
         %{taken_dates: taken_log} |> Poison.encode!()
       )
     else
+      {:error, :no_such_timer} ->
+        msg = ~s(No timer with id "#{timer_id}")
+        send_resp(conn, 404, %{error: msg} |> Poison.encode!())
+
       {:error, _reason} ->
         send_resp(conn, 500, "")
     end
@@ -47,15 +59,30 @@ defmodule Pillminder.WebRouter.Stats do
     send_resp(conn, 404, "")
   end
 
-  @spec get_date() :: {:ok, Date.t()} | {:error, {:get_time, any()}}
-  defp get_date() do
-    case Timex.local() |> Util.Error.ok_or() do
+  @spec get_date(Timex.Types.valid_timezone()) ::
+          {:ok, Date.t()} | {:error, {:get_time, any()}} | {:error, :no_such_timer}
+  defp get_date(tz) do
+    case Timex.now(tz) |> Util.Error.ok_or() do
       {:ok, now} ->
         {:ok, DateTime.to_date(now)}
 
       {:error, reason} ->
         Logger.error("Failed to get current date: #{inspect(reason)}")
         {:error, {:get_time, reason}}
+    end
+  end
+
+  @spec(
+    get_tz_for_timer(String.t()) :: {:ok, Timex.Types.valid_timezone()},
+    {:error, :no_such_timer}
+  )
+  defp get_tz_for_timer(timer_id) do
+    # This can technically fail but that's fine; it almost certainly won't after application load
+    Config.load_timers_from_env!()
+    |> Enum.find(fn timer -> timer.id == timer_id end)
+    |> case do
+      nil -> {:error, :no_such_timer}
+      %Config.Timer{reminder_time_zone: zone} -> {:ok, zone}
     end
   end
 
