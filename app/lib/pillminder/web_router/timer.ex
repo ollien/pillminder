@@ -58,6 +58,13 @@ defmodule Pillminder.WebRouter.Timer do
         Logger.debug(msg)
         send_resp(conn, 400, %{error: msg} |> Poison.encode!())
 
+      {:error, :not_timing} ->
+        send_resp(
+          conn,
+          409,
+          %{error: "Timer is not currently running, cannot snooze."} |> Poison.encode!()
+        )
+
       {:error, :no_timer} ->
         msg = ~s(No timer with id "#{timer_id}")
         send_resp(conn, 404, %{error: msg} |> Poison.encode!())
