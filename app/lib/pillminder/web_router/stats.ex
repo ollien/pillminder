@@ -4,15 +4,16 @@ defmodule Pillminder.WebRouter.Stats do
   alias Pillminder.Config
   alias Pillminder.Stats
   alias Pillminder.Util
-  alias Pillminder.WebRouter.Plugs
+  alias Pillminder.WebRouter.Helper
 
   use Plug.Router
 
   plug(:match)
-  plug(Plugs.Auth)
   plug(:dispatch)
 
   get "/:timer_id/summary" do
+    Helper.Auth.authorize_request(conn, timer_id)
+
     with {:ok, tz} <- get_tz_for_timer(timer_id),
          {:ok, today} <- get_date(tz),
          {:ok, streak_length} <- streak_length(timer_id, today),
@@ -37,6 +38,8 @@ defmodule Pillminder.WebRouter.Stats do
   end
 
   get "/:timer_id/history" do
+    Helper.Auth.authorize_request(conn, timer_id)
+
     with {:ok, tz} <- get_tz_for_timer(timer_id),
          {:ok, today} <- get_date(tz),
          {:ok, taken_log} <- taken_dates(timer_id, today) do

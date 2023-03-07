@@ -4,12 +4,11 @@ defmodule Pillminder.WebRouter.Timer do
   alias Pillminder.Stats
   alias Pillminder.Util.QueryParam
   alias Pillminder.ReminderSender
-  alias Pillminder.WebRouter.Plugs
+  alias Pillminder.WebRouter.Helper
 
   use Plug.Router
 
   plug(:match)
-  plug(Plugs.Auth)
   plug(:dispatch)
 
   @snooze_time_param "snooze_time"
@@ -18,6 +17,8 @@ defmodule Pillminder.WebRouter.Timer do
   @max_snooze_time Timex.Duration.from_hours(3) |> Timex.Duration.to_milliseconds(truncate: true)
 
   delete "/:timer_id" do
+    Helper.Auth.authorize_request(conn, timer_id)
+
     with :ok <- dismiss_timer(timer_id),
          :ok <- record_taken(timer_id) do
       send_resp(conn, 204, "")
@@ -39,6 +40,8 @@ defmodule Pillminder.WebRouter.Timer do
   end
 
   post "/:timer_id/snooze" do
+    Helper.Auth.authorize_request(conn, timer_id)
+
     conn = Plug.Conn.fetch_query_params(conn)
 
     with {:ok, params} <- parse_snooze_query_params(conn.query_params),
