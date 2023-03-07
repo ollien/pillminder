@@ -1,8 +1,9 @@
 defmodule Pillminder.WebRouter.Timer do
   require Logger
 
+  alias Pillminder.Config
   alias Pillminder.Stats
-  alias Pillminder.Util.QueryParam
+  alias Pillminder.Util
   alias Pillminder.ReminderSender
   alias Pillminder.WebRouter.Helper
 
@@ -97,14 +98,12 @@ defmodule Pillminder.WebRouter.Timer do
 
   @spec(record_taken(String.t()) :: :ok, {:error, {:recording, any()}})
   defp record_taken(timer_id) do
-    # TODO: this time is local to the server, we should be doing it in time local to the pillminder
-    now = Timex.local()
-
-    case Stats.record_taken(timer_id, now) do
-      :ok ->
-        Logger.info("Recorded medication for #{timer_id} as taken today")
-        :ok
-
+    with {:ok, tz} <- get_tz_for_timer(timer_id),
+         now = Util.Time.now!(tz),
+         :ok <- Stats.record_taken(timer_id, now) do
+      Logger.info("Recorded medication for #{timer_id} as taken today")
+      :ok
+    else
       {:error, :already_taken_today} ->
         Logger.warn("Medication marked as taken for #{timer_id} already today.")
 
@@ -124,7 +123,7 @@ defmodule Pillminder.WebRouter.Timer do
           {:ok, %{String.t() => String.t()}}
           | {:error, {atom, String.t(), {String.t(), String.t()}}}
   defp parse_snooze_query_params(params = %{}) do
-    with {:ok, value} <- QueryParam.get_value(params, @snooze_time_param),
+    with {:ok, value} <- Util.QueryParam.get_value(params, @snooze_time_param),
          {:ok, snooze_time} <- parse_snooze_time_param(value) do
       parsed_params = Map.put(params, @snooze_time_param, snooze_time)
       {:ok, parsed_params}
@@ -155,6 +154,20 @@ defmodule Pillminder.WebRouter.Timer do
 
       _ ->
         {:error, {:invalid_param, "invalid integer", {@snooze_time_param, snooze_time_param}}}
+    end
+  end
+
+  @spec(
+    get_tz_for_timer(String.t()) :: {:ok, Timex.Types.valid_timezone()},
+    {:error, :no_such_timer}
+  )
+  defp get_tz_for_timer(timer_id) do
+    # This can technically fail but that's fine; it almost certainly won't after application load
+    Config.load_timers_from_env!()
+    |> Enum.find(fn timer -> timer.id == timer_id end)
+    |> case do
+      nil -> {:error, :no_such_timer}
+      %Config.Timer{reminder_time_zone: zone} -> {:ok, zone}
     end
   end
 end
