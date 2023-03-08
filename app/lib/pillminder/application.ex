@@ -15,9 +15,9 @@ defmodule Pillminder.Application do
 
     children = [
       Pillminder.Stats.Repo,
+      Pillminder.Auth,
       {Pillminder.ReminderSender, make_senders_for_timers(timers)},
       {Scheduler, make_scheduler_args(timers)},
-      Pillminder.Auth,
       {Plug.Cowboy, scheme: :http, plug: Pillminder.WebRouter, options: http_server_opts}
     ]
 
