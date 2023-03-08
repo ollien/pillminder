@@ -1,8 +1,9 @@
 # Pillminder
 
-Pillminder is an application designed to remind you to take your daily medication. It
-uses [ntfy.sh](https://ntfy.sh/) to push reminders to your phone at
-preconfigured times, until you mark it as taken.
+Pillminder is an application designed to remind you to take your daily
+medication. It uses [ntfy.sh](https://ntfy.sh/) to push reminders to your phone
+at preconfigured times, until you mark it as taken. It designed to be
+"annoying", forcing you to take your medication before it leaves you alone.
 
 ## Setup
 
