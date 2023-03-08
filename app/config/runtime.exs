@@ -3,7 +3,7 @@ import Config
 config :pillminder,
   timers: [
     [
-      id: "nick",
+      id: "my-pillminder",
       # seconds
       reminder_spacing: 5,
       reminder_start_time: ~T[18:43:00],

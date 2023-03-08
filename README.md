@@ -44,8 +44,9 @@ config :pillminder,
   server:
     # The address for the http server to listen on
     listen_addr: "127.0.0.1"
-    # The port for the HTTP server to listen on
-    port: 8080
+    # The port for the HTTP server to listen on. By default, nginx in the `web` container points to port 8000,
+    # but this can freely be changed if needed.
+    port: 8000
 ```
 
 Lastly, you must configure Docker Compose to point to your directory. You
@@ -73,3 +74,15 @@ This application consists of two parts:
   and provide a REST API (located in the `app` directory).
 - A small React frontend (located in the `web-client` directory). This builds
   to static HTML/JS files, which can be distributed with any webserver.
+
+### Backend Serer
+
+The development webserver can be run using `mix run --no-halt` in the `app`
+directory. If `MIX_ENV` is set to `dev`, then the web-client will be served at
+`/app/`, as well.
+
+### Frontend
+
+The frontend can be built with `npm run build:dev`, which will compile to
+static html files in the `dist` directory. You can also use `npm start` to
+start a watchful webpack instance for instant-rebuild.
