@@ -1,6 +1,12 @@
 defmodule Pillminder.Config do
   import Norm
 
+  @doc """
+  Load the HTTP server configuration from the application environment. Throws
+  an exception if the data does not set form to the typespec set forth in
+  Pillminder.Config.Server.
+  """
+  @spec load_server_settings_from_env!() :: [Pillminder.Config.Server.t()]
   def load_server_settings_from_env!() do
     server_config =
       case Application.fetch_env(:pillminder, :server) do
