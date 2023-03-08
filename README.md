@@ -33,9 +33,8 @@ config :pillminder,
       reminder_time_zone: "America/New_York",
       # The topic on which ntfy.sh will remind you. This is technically public, so pick something sufficiently random.
       ntfy_topic: "REPLACE_ME",
-      # optional, a "fudge time", expressed seconds. If specified, your
-      # reminders will start at the specified start time, plus a random number
-      # of seconds, with an upper bound of the specified fudge time
+      # optional, a "fudge time", expressed seconds. If specified, your # reminders will start at the specified start
+      # time, plus a random number of seconds, with an upper bound of the specified fudge time
       reminder_start_fudge_time: 10 * 60
     ]
   ],
