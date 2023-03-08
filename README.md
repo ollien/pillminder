@@ -31,7 +31,7 @@ config :pillminder,
       # (Timex recognizes some other formats, as well)
       reminder_time_zone: "America/New_York",
       # The topic on which ntfy.sh will remind you. This is technically public, so pick something sufficiently random.
-      ntfy_topic: "REPLACE_ME"
+      ntfy_topic: "REPLACE_ME",
       # optional, a "fudge time", expressed seconds. If specified, your
       # reminders will start at the specified start time, plus a random number
       # of seconds, with an upper bound of the specified fudge time
@@ -39,14 +39,15 @@ config :pillminder,
     ]
   ],
   # The base address that all URLs in notifications will be based on
-  base_url: "http://your-hostname"
+  base_url: "http://your-hostname",
   # optional, HTTP server settings
-  server:
+  server: [
     # The address for the http server to listen on
-    listen_addr: "127.0.0.1"
+    listen_addr: "127.0.0.1",
     # The port for the HTTP server to listen on. By default, nginx in the `web` container points to port 8000,
     # but this can freely be changed if needed.
     port: 8000
+  ]
 ```
 
 Lastly, you must configure Docker Compose to point to your directory. You
