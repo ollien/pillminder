@@ -11,17 +11,29 @@ defmodule Pillminder.Application do
   @impl true
   def start(_type, _args) do
     timers = Config.load_timers_from_env!()
+    http_server_opts = http_server_opts!()
 
     children = [
       Pillminder.Stats.Repo,
       {Pillminder.ReminderSender, make_senders_for_timers(timers)},
       {Scheduler, make_scheduler_args(timers)},
       Pillminder.Auth,
-      # # TODO: Add port to config file
-      {Plug.Cowboy, scheme: :http, plug: Pillminder.WebRouter, options: [port: 8000]}
+      {Plug.Cowboy, scheme: :http, plug: Pillminder.WebRouter, options: http_server_opts}
     ]
 
     Supervisor.start_link(children, strategy: :one_for_one, name: Pillminder.Supervisor)
+  end
+
+  defp http_server_opts!() do
+    server_config = Config.load_server_settings_from_env!()
+
+    {:ok, listen_addr} =
+      server_config.listen_addr
+      |> String.to_charlist()
+      |> :inet.parse_address()
+
+    Logger.info("Starting HTTP server on port #{server_config.listen_addr}:#{server_config.port}")
+    [port: server_config.port, ip: listen_addr]
   end
 
   @spec make_senders_for_timers([Config.Timer.t()]) :: ReminderSender.senders()
