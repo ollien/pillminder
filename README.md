@@ -1,6 +1,6 @@
 # Pillminder
 
-Pillminder is an application designed to remind you to take your medication. It
+Pillminder is an application designed to remind you to take your daily medication. It
 uses [ntfy.sh](https://ntfy.sh/) to push reminders to your phone at
 preconfigured times, until you mark it as taken.
 
@@ -27,6 +27,9 @@ config :pillminder,
       reminder_spacing: 5 * 60,
       # The time that you will start being reminded, expressed in the timezone in which this application runs.
       reminder_start_time: ~T[09:30:00],
+      # The time zone in which timezones should be used. This can be either :local or a standard timezone string
+      # (Timex recognizes some other formats, as well)
+      reminder_time_zone: "America/New_York",
       # The topic on which ntfy.sh will remind you. This is technically public, so pick something sufficiently random.
       ntfy_topic: "REPLACE_ME"
       # optional, a "fudge time", expressed seconds. If specified, your
@@ -35,7 +38,14 @@ config :pillminder,
       reminder_start_fudge_time: 10 * 60
     ]
   ],
+  # The base address that all URLs in notifications will be based on
   base_url: "http://your-hostname"
+  # optional, HTTP server settings
+  server:
+    # The address for the http server to listen on
+    listen_addr: "127.0.0.1"
+    # The port for the HTTP server to listen on
+    port: 8080
 ```
 
 Lastly, you must configure Docker Compose to point to your directory. You
