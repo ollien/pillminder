@@ -1,9 +1,7 @@
 defmodule Pillminder.WebRouter.Helper.Auth do
   @moduledoc """
-  Auth is a plug that will authenticate requests with `Pillminder.Auth`. All requests must pass through a
-  route that identifies a specific pillminder, and the route parameter which does so must be specified in the opts.
-
-  This must be specified after the `:match` plug.
+  Auth helps authenticate requests with `Pillminder.Auth` for a specific timer. This is useful to ensure
+  that routes do not have to constantly re-specify auth logic
   """
 
   require Logger
