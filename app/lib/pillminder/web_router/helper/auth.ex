@@ -7,6 +7,8 @@ defmodule Pillminder.WebRouter.Helper.Auth do
   require Logger
   import Plug.Conn
 
+  alias Pillminder.WebRouter.Helper
+
   defmodule BadAuthorization do
     defexception message: "Malformed authorization provided",
                  plug_status: 400
@@ -27,7 +29,7 @@ defmodule Pillminder.WebRouter.Helper.Auth do
 
     def exception(timer_id: timer_id) do
       %Forbidden{
-        message: ~s(No timer with id "#{timer_id}")
+        message: Helper.Response.not_found(timer_id)
       }
     end
   end

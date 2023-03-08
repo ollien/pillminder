@@ -70,7 +70,7 @@ defmodule Pillminder.WebRouter.Timer do
         )
 
       {:error, :no_timer} ->
-        msg = ~s(No timer with id "#{timer_id}")
+        msg = Helper.Response.not_found(timer_id)
         send_resp(conn, 404, %{error: msg} |> Poison.encode!())
     end
   end

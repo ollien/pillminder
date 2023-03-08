@@ -29,7 +29,7 @@ defmodule Pillminder.WebRouter.Stats do
       )
     else
       {:error, :no_such_timer} ->
-        msg = ~s(No timer with id "#{timer_id}")
+        msg = Helper.Response.not_found(timer_id)
         send_resp(conn, 404, %{error: msg} |> Poison.encode!())
 
       {:error, _reason} ->
@@ -50,7 +50,7 @@ defmodule Pillminder.WebRouter.Stats do
       )
     else
       {:error, :no_such_timer} ->
-        msg = ~s(No timer with id "#{timer_id}")
+        msg = Helper.Response.not_found(timer_id)
         send_resp(conn, 404, %{error: msg} |> Poison.encode!())
 
       {:error, _reason} ->
