@@ -6,7 +6,7 @@ defmodule Pillminder.Config do
   an exception if the data does not set form to the typespec set forth in
   Pillminder.Config.Server.
   """
-  @spec load_server_settings_from_env!() :: [Pillminder.Config.Server.t()]
+  @spec load_server_settings_from_env!() :: Pillminder.Config.Server.t()
   def load_server_settings_from_env!() do
     server_config =
       case Application.fetch_env(:pillminder, :server) do

@@ -24,6 +24,7 @@ defmodule Pillminder.Application do
     Supervisor.start_link(children, strategy: :one_for_one, name: Pillminder.Supervisor)
   end
 
+  @spec http_server_opts!() :: [port: number(), ip: :inet.ip_address()]
   defp http_server_opts!() do
     server_config = Config.load_server_settings_from_env!()
 
