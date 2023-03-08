@@ -34,6 +34,9 @@ defmodule Pillminder.WebRouter.Helper.Auth do
     end
   end
 
+  # Dialyzer gets confused about the 'with' statement here.
+  # https://dev.to/lasseebert/til-understanding-dialyzer-s-the-pattern-can-never-match-the-type-2mmm
+  @dialyzer {:no_match, authorize_request: 2}
   @spec authorize_request(Plug.Conn.t(), String.t()) :: Plug.Conn.t()
   def authorize_request(conn, timer_id) do
     with {:ok, token} <- token_from_request(conn),
