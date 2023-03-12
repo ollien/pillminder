@@ -11,6 +11,7 @@ defmodule Pillminder.Config.Timer do
     :reminder_start_time,
     :reminder_time_zone,
     :ntfy_topic,
+    ntfy_api_key: nil,
     reminder_start_time_fudge: 0
   ]
 
@@ -20,6 +21,7 @@ defmodule Pillminder.Config.Timer do
           reminder_start_time: Time.t(),
           reminder_time_zone: Timex.Types.valid_timezone(),
           ntfy_topic: String.t(),
+          ntfy_api_key: String.t() | nil,
           reminder_start_time_fudge: non_neg_integer()
         }
 
@@ -32,6 +34,7 @@ defmodule Pillminder.Config.Timer do
         reminder_time_zone:
           spec(is_binary() or is_integer() or (&(&1 == :local)) or (&(&1 == :utc))),
         reminder_start_time_fudge: spec(is_integer() and (&(&1 >= 0))),
-        ntfy_topic: spec(is_binary())
+        ntfy_topic: spec(is_binary()),
+        ntfy_api_key: spec(is_binary() or is_nil())
       })
 end

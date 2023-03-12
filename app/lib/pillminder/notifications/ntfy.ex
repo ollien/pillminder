@@ -1,12 +1,23 @@
 defmodule Pillminder.Notifications.Ntfy do
   alias Pillminder.Notifications.Ntfy.HttpClient
 
-  @spec push_notification(topic :: String.t(), ntfy_options :: %{(String.t() | atom()) => any()}) ::
+  @spec push_notification(
+          topic :: String.t(),
+          notification_options :: %{(String.t() | atom()) => any()},
+          api_key :: String.t() | nil
+        ) ::
           {:ok, HTTPoison.Response.t()}
           | {:error, {:bad_status, HTTPoison.Response.t()} | HTTPoison.Error.t()}
-  def push_notification(topic, ntfy_options) do
-    body = Map.put(ntfy_options, :topic, topic)
-    HttpClient.post("/", body, [], follow_redirect: true) |> error_for_status()
+  def push_notification(topic, notification_options, api_key \\ nil) do
+    body = Map.put(notification_options, :topic, topic)
+
+    headers =
+      case api_key do
+        nil -> []
+        api_key -> [{"Authorization", "Bearer #{api_key}"}]
+      end
+
+    HttpClient.post("/", body, headers, follow_redirect: true) |> error_for_status()
   end
 
   @spec error_for_status({:ok, response}) ::

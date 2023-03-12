@@ -54,7 +54,7 @@ defmodule Pillminder.Notifications do
   @spec send_ntfy_notification(Config.Timer.t(), %{atom() => any()}) ::
           :ok | {:error, {:ntfy_error, any()}}
   defp send_ntfy_notification(timer, body) do
-    case Ntfy.push_notification(timer.ntfy_topic, body) do
+    case Ntfy.push_notification(timer.ntfy_topic, body, timer.ntfy_api_key) do
       {:ok, resp} ->
         Logger.debug("Got response from ntfy: #{inspect(resp)}")
         :ok

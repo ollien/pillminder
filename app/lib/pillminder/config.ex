@@ -40,7 +40,8 @@ defmodule Pillminder.Config do
         reminder_start_time: config_timer[:reminder_start_time],
         reminder_time_zone: config_timer[:reminder_time_zone],
         reminder_start_time_fudge: Keyword.get(config_timer, :reminder_start_time_fudge, 0),
-        ntfy_topic: config_timer[:ntfy_topic]
+        ntfy_topic: config_timer[:ntfy_topic],
+        ntfy_api_key: config_timer[:ntfy_api_key]
       },
       Pillminder.Config.Timer.s()
     )
