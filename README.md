@@ -99,7 +99,8 @@ services:
 ```
 
 You can start the application with `docker compose up` (if a rebuild is
-required, run `docker compose build`)
+required, run `docker compose build`), and the web UI will be available at `/`
+on the provided port.
 
 ## Development
 
