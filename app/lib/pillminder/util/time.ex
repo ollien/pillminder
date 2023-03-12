@@ -13,7 +13,7 @@ defmodule Pillminder.Util.Time do
   end
 
   @doc """
-    Get the nest time the given time occurs, or the nest best available option if there is ambiguity.
+    Get the next time the given time occurs, or the nest best available option if there is ambiguity.
 
     It is entirely possible, for instance, after daylight savings time for there to be a time that does
     not exactly match the desired time, but it will match as far as the "delta" goes. e.g. 2am on the DST
@@ -22,34 +22,27 @@ defmodule Pillminder.Util.Time do
   @spec get_next_occurrence_of_time(
           now :: DateTime.t(),
           target_time :: Time.t()
-        ) :: DateTime.t() | {:error, any}
+        ) :: DateTime.t()
   def get_next_occurrence_of_time(now, target_time) do
-    case set_time_in_date(now, target_time) do
-      err = {:error, _} -> err
-      candidate -> select_time(now, candidate)
-    end
+    set_time_in_date(now, target_time)
+    |> select_time(now)
   end
 
-  @spec set_time_in_date(DateTime.t(), Time.t()) :: DateTime.t() | {:error, any}
+  @spec set_time_in_date(DateTime.t(), Time.t()) :: DateTime.t()
   defp set_time_in_date(now, target_time) do
-    time_as_duration = Timex.Duration.from_time(target_time)
-
-    case Timex.beginning_of_day(now) |> Timex.add(time_as_duration) do
-      err = {:error, _} -> err
-      # We're just setting the time, and we don't really have a compelling reason to choose the "before"
-      # and Timex suggests we pick the "after" anyway
-      #
-      # (I also don't know that there's an ambiguous case here so I'm going to fall back to the default)
-      %Timex.AmbiguousDateTime{after: after_set_time} -> after_set_time
-      set_time = %DateTime{} -> set_time
-    end
+    Timex.set(now,
+      hour: target_time.hour,
+      minute: target_time.minute,
+      second: target_time.second,
+      microsecond: target_time.microsecond
+    )
   end
 
   @spec select_time(
-          now :: DateTime.t(),
-          candidate :: DateTime.t()
+          candidate :: DateTime.t(),
+          now :: DateTime.t()
         ) :: DateTime.t()
-  defp select_time(now, candidate) do
+  defp select_time(candidate, now) do
     if Timex.after?(now, candidate) do
       # If we've already passed the candidate time, add one day and resolve the ambiguity if needed
       new_candidate = Timex.shift(candidate, days: 1)

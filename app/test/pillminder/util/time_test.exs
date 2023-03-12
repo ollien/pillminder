@@ -25,7 +25,7 @@ defmodule PillminderTest.Util.Time do
              )
     end
 
-    test "picks the next best time when time is on the the daylight savings boundary when springing forward" do
+    test "picks the next best time when time is on the daylight savings boundary when springing forward" do
       # 2022-03-13 is a DST crossover day
       now = Timex.to_datetime({{2022, 3, 13}, {1, 0, 0}}, "America/New_York")
       next_occurrence = Util.Time.get_next_occurrence_of_time(now, ~T[02:00:00])
@@ -44,6 +44,28 @@ defmodule PillminderTest.Util.Time do
       assert Timex.equal?(
                next_occurrence,
                Timex.to_datetime({{2022, 11, 6}, {1, 0, 0}}, "America/New_York").after
+             )
+    end
+
+    test "picks the next best time when time is on the same day as the daylight savings boundary when springing forward" do
+      # 2023-03-12 is a DST crossover day
+      now = Timex.to_datetime({{2023, 3, 12}, {10, 0, 0}}, "America/New_York")
+      next_occurrence = Util.Time.get_next_occurrence_of_time(now, ~T[07:00:00])
+
+      assert Timex.equal?(
+               next_occurrence,
+               Timex.to_datetime({{2023, 3, 13}, {7, 0, 0}}, "America/New_York")
+             )
+    end
+
+    test "picks the next best time when time is on the same day as the daylight savings boundary when falling back forward" do
+      # 2022-11-06 is a DST crossover day
+      now = Timex.to_datetime({{2022, 11, 6}, {10, 0, 0}}, "America/New_York")
+      next_occurrence = Util.Time.get_next_occurrence_of_time(now, ~T[07:00:00])
+
+      assert Timex.equal?(
+               next_occurrence,
+               Timex.to_datetime({{2022, 11, 7}, {7, 0, 0}}, "America/New_York")
              )
     end
 
