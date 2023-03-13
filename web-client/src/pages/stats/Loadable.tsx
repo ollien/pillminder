@@ -5,7 +5,7 @@ import { BounceLoader } from "react-spinners";
 
 interface LoadableProps {
 	isLoading: boolean;
-	error?: string;
+	error: string | null;
 }
 
 const Loadable = ({

@@ -6,6 +6,9 @@ import StatsCardContents from "pillminder-webclient/src/pages/stats/StatsCardCon
 import React from "react";
 import { ErrorBoundary, FallbackProps } from "react-error-boundary";
 
+const NO_PILLMINDER_ERROR = "No pillminder selected";
+const INVALID_TOKEN_ERROR = "Your session has expired. Please log in again";
+
 interface StatsProps {
 	pillminder?: string;
 	token?: string;
@@ -24,6 +27,28 @@ const BoundaryError = ({ error }: FallbackProps) => {
 };
 
 const Stats = ({ pillminder, token }: StatsProps) => {
+	const propError = (() => {
+		if (pillminder == null) {
+			NO_PILLMINDER_ERROR;
+		} else if (token == null) {
+			return INVALID_TOKEN_ERROR;
+		} else {
+			return null;
+		}
+	})();
+
+	const propErrorComponent = propError ? (
+		<CardError>{propError}</CardError>
+	) : null;
+	const buildBody = () => (
+		<ErrorBoundary FallbackComponent={BoundaryError}>
+			{/*
+				Typescript isn't smart enough to see this, but if we're rendering
+				this, we've already asserted both of these aren't null
+			*/}
+			<StatsCardContents pillminder={pillminder!} token={token!} />
+		</ErrorBoundary>
+	);
 	return (
 		<CardPage maxWidth="container.md">
 			<CardHeader>
@@ -31,11 +56,7 @@ const Stats = ({ pillminder, token }: StatsProps) => {
 					{getHeadingMsg(pillminder)}
 				</Heading>
 			</CardHeader>
-			<CardBody width="100%">
-				<ErrorBoundary FallbackComponent={BoundaryError}>
-					<StatsCardContents pillminder={pillminder} token={token} />
-				</ErrorBoundary>
-			</CardBody>
+			<CardBody width="100%">{propErrorComponent ?? buildBody()}</CardBody>
 		</CardPage>
 	);
 };

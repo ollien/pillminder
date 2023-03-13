@@ -16,7 +16,12 @@
 		"ecmaVersion": "latest",
 		"sourceType": "module"
 	},
-	"plugins": ["react", "@typescript-eslint", "unused-imports"],
+	"plugins": [
+		"react",
+		"@typescript-eslint",
+		"unused-imports",
+		"@tanstack/query"
+	],
 	"rules": {
 		"linebreak-style": ["error", "unix"],
 		"quotes": ["error", "double"],
@@ -32,6 +37,8 @@
 				"argsIgnorePattern": "^_"
 			}
 		],
+		"@tanstack/query/exhaustive-deps": "error",
+		"@tanstack/query/prefer-query-object-syntax": "error",
 		"@typescript-eslint/no-non-null-assertion": "off",
 		"@typescript-eslint/no-inferrable-types": "off"
 	},

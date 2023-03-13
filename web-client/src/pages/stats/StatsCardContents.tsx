@@ -8,26 +8,32 @@ import { makeErrorString } from "pillminder-webclient/src/pages/_common/errors";
 import History from "pillminder-webclient/src/pages/stats/History";
 import Loadable from "pillminder-webclient/src/pages/stats/Loadable";
 import Summary from "pillminder-webclient/src/pages/stats/Summary";
-import React, { useCallback, useEffect, useState } from "react";
-
-const NO_PILLMINDER_ERROR = "No pillminder selected";
-const INVALID_TOKEN_ERROR = "Your session has expired. Please log in again";
+import React from "react";
+import { useQuery, UseQueryResult } from "react-query";
 
 interface StatsCardBodyProps {
-	pillminder?: string;
-	token?: string;
+	pillminder: string;
+	token: string;
 }
 
-const makeEmptyPillminderError = (pillminder: string | undefined) => {
-	if (pillminder == null) {
-		return NO_PILLMINDER_ERROR;
+const makeQueryError = <T, E>(
+	query: UseQueryResult<T, E>,
+	prefix?: string
+): string | null => {
+	if (!query.isError) {
+		return null;
 	}
 
-	return null;
+	const errString = makeErrorString(query.error);
+	if (prefix) {
+		return `${prefix}: ` + errString;
+	} else {
+		return errString;
+	}
 };
 
 const makeConsolidatedFetchError = (
-	...fetchErrors: (string | undefined)[]
+	...fetchErrors: (string | null)[]
 ): string | null => {
 	if (
 		fetchErrors.length == 0 ||
@@ -42,14 +48,8 @@ const makeConsolidatedFetchError = (
 };
 
 const makeErrorComponentMessage = (
-	pillminder: string | undefined,
-	...fetchErrors: (string | undefined)[]
+	...fetchErrors: (string | null)[]
 ): string | null => {
-	const emptyPillminderError = makeEmptyPillminderError(pillminder);
-	if (emptyPillminderError) {
-		return emptyPillminderError;
-	}
-
 	const consolidatedFetchError = makeConsolidatedFetchError(...fetchErrors);
 	if (consolidatedFetchError) {
 		// We know from the `every` that this must be non-null.
@@ -60,10 +60,9 @@ const makeErrorComponentMessage = (
 };
 
 const makeErrorComponent = (
-	pillminder: string | undefined,
-	...fetchErrors: (string | undefined)[]
+	...fetchErrors: (string | null)[]
 ): JSX.Element | null => {
-	const errorMsg = makeErrorComponentMessage(pillminder, ...fetchErrors);
+	const errorMsg = makeErrorComponentMessage(...fetchErrors);
 	if (errorMsg == null) {
 		return null;
 	}
@@ -71,56 +70,16 @@ const makeErrorComponent = (
 	return <CardError>{errorMsg}</CardError>;
 };
 
-const useAPI = <T,>(doFetch: () => Promise<T>): [T?, string?] => {
-	const [data, setData] = useState<T | undefined>(undefined);
-	const [error, setError] = useState<string | undefined>(undefined);
-
-	useEffect(() => {
-		doFetch()
-			.then(setData)
-			.catch((err) => {
-				const msg = makeErrorString(err);
-				setError(msg);
-			});
-	}, [doFetch]);
-
-	return [data, error];
-};
-
 const StatsCardContents = ({ pillminder, token }: StatsCardBodyProps) => {
-	const summaryCallback = useCallback(async () => {
-		if (pillminder == null) {
-			throw Error(NO_PILLMINDER_ERROR);
-		} else if (token == null) {
-			throw Error(INVALID_TOKEN_ERROR);
-		}
+	const summaryQuery = useQuery({
+		queryKey: ["summary", pillminder, token],
+		queryFn: () => getStatsSummary(token, pillminder),
+	});
 
-		try {
-			return getStatsSummary(token, pillminder);
-		} catch (err) {
-			throw new Error("Failed to fetch summary", {
-				cause: makeErrorString(err),
-			});
-		}
-	}, [pillminder, token]);
-	const [statsSummary, statsSummaryError] = useAPI(summaryCallback);
-
-	const takenDatesCallback = useCallback(async () => {
-		if (pillminder == null) {
-			throw Error(NO_PILLMINDER_ERROR);
-		} else if (token == null) {
-			throw Error(INVALID_TOKEN_ERROR);
-		}
-
-		try {
-			return getTakenDates(token, pillminder);
-		} catch (err) {
-			throw new Error("Failed to fetch taken dates", {
-				cause: makeErrorString(err),
-			});
-		}
-	}, [pillminder, token]);
-	const [takenDates, takenDatesError] = useAPI(takenDatesCallback);
+	const historyQuery = useQuery({
+		queryKey: ["history", pillminder, token],
+		queryFn: () => getTakenDates(token, pillminder),
+	});
 
 	const statsBody = (
 		<HStack
@@ -130,24 +89,23 @@ const StatsCardContents = ({ pillminder, token }: StatsCardBodyProps) => {
 			height="100%"
 		>
 			<Loadable
-				isLoading={statsSummary == null && statsSummaryError == null}
-				error={statsSummaryError}
+				isLoading={summaryQuery.isLoading}
+				error={makeQueryError(summaryQuery, "Failed to load summary")}
 			>
-				<Summary statsSummary={statsSummary!} />
+				<Summary statsSummary={summaryQuery.data!} />
 			</Loadable>
 			<Loadable
-				isLoading={takenDates == null && takenDatesError == null}
-				error={takenDatesError}
+				isLoading={historyQuery.isLoading}
+				error={makeQueryError(historyQuery, "Failed to load history")}
 			>
-				<History takenDates={takenDates!} />
+				<History takenDates={historyQuery.data!} />
 			</Loadable>
 		</HStack>
 	);
 
 	const errorComponent = makeErrorComponent(
-		pillminder,
-		statsSummaryError,
-		takenDatesError
+		makeQueryError(summaryQuery),
+		makeQueryError(historyQuery)
 	);
 
 	return errorComponent ?? statsBody;
