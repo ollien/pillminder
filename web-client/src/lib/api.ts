@@ -1,7 +1,8 @@
 import joi from "joi";
 import { DateTime } from "luxon";
 
-const INVALID_TOKEN_ERROR = "Your session has expired. Please log in again";
+const INVALID_TOKEN_ERROR =
+	"Your session has expired, or this pillminder no longer exists. Please log in again";
 
 /**
  * A summary of statistics about a user's medication
@@ -112,7 +113,7 @@ export async function getStatsSummary(
 		}
 	);
 
-	if (res.status === 401) {
+	if (res.status === 404) {
 		throw new Error(INVALID_TOKEN_ERROR);
 	} else if (res.status >= 400) {
 		// This api doesn't return any real errors, so we can just give a generic message
@@ -151,7 +152,7 @@ export async function getTakenDates(
 		}
 	);
 
-	if (res.status === 401) {
+	if (res.status === 404) {
 		throw new Error(INVALID_TOKEN_ERROR);
 	} else if (res.status >= 400) {
 		throw new Error("Failed to load taken dates");
