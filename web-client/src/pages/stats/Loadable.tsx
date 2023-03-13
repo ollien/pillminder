@@ -1,5 +1,5 @@
 import { Center } from "@chakra-ui/react";
-import ErrorText from "pillminder-webclient/src/pages/stats/ErrorText";
+import ErrorText from "pillminder-webclient/src/pages/_common/ErrorText";
 import React from "react";
 import { BounceLoader } from "react-spinners";
 
@@ -22,7 +22,7 @@ const Loadable = ({
 	} else if (error) {
 		return (
 			<Center>
-				<ErrorText text={error} />
+				<ErrorText>{error}</ErrorText>
 			</Center>
 		);
 	} else {

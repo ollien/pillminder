@@ -1,9 +1,10 @@
-import { Center, HStack, StackDivider } from "@chakra-ui/react";
+import { HStack, StackDivider } from "@chakra-ui/react";
 import {
 	getStatsSummary,
 	getTakenDates,
 } from "pillminder-webclient/src/lib/api";
-import ErrorText from "pillminder-webclient/src/pages/_common/ErrorText";
+import CardError from "pillminder-webclient/src/pages/_common/CardError";
+import { makeErrorString } from "pillminder-webclient/src/pages/_common/errors";
 import History from "pillminder-webclient/src/pages/stats/History";
 import Loadable from "pillminder-webclient/src/pages/stats/Loadable";
 import Summary from "pillminder-webclient/src/pages/stats/Summary";
@@ -16,16 +17,6 @@ interface StatsCardBodyProps {
 	pillminder?: string;
 	token?: string;
 }
-
-const makeErrorString = (err: Error | unknown): string => {
-	if (err instanceof Error && err.cause != null) {
-		return `${err.message}: ${makeErrorString(err.cause)}`;
-	} else if (err instanceof Error) {
-		return err.message;
-	} else {
-		return `${err}`;
-	}
-};
 
 const makeEmptyPillminderError = (pillminder: string | undefined) => {
 	if (pillminder == null) {
@@ -42,7 +33,7 @@ const makeConsolidatedFetchError = (
 		fetchErrors.length == 0 ||
 		!fetchErrors.every((item) => item === fetchErrors[0] && item != null)
 	) {
-		// Either the messages can't be conslidated, or there are no errors, which is fine. We just won't use them.
+		// Either the messages can't be consolidated, or there are no errors, which is fine. We just won't use them.
 		return null;
 	}
 
@@ -77,7 +68,7 @@ const makeErrorComponent = (
 		return null;
 	}
 
-	return StatsError(errorMsg);
+	return <CardError>{errorMsg}</CardError>;
 };
 
 const useAPI = <T,>(doFetch: () => Promise<T>): [T?, string?] => {
@@ -94,14 +85,6 @@ const useAPI = <T,>(doFetch: () => Promise<T>): [T?, string?] => {
 	}, [doFetch]);
 
 	return [data, error];
-};
-
-const StatsError = (msg: string) => {
-	return (
-		<Center>
-			<ErrorText>{msg}</ErrorText>
-		</Center>
-	);
 };
 
 const StatsCardContents = ({ pillminder, token }: StatsCardBodyProps) => {
