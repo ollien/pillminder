@@ -17,6 +17,7 @@ defmodule Pillminder.WebRouter.Auth do
     else
       {:error, {:missing_in_body, _key}} ->
         Logger.debug("No pillminder/timer_id found in request")
+        send_resp(conn, 400, Poison.encode!(%{error: "No pillminder/timer_id found in request"}))
 
       {:error, {:no_such_timer, timer_id}} ->
         Logger.debug("Pillminder #{timer_id} not found")
