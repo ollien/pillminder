@@ -6,10 +6,7 @@ import {
 	Text,
 } from "@chakra-ui/react";
 import { Field, FieldProps } from "formik";
-import {
-	exchangeAccessCode,
-	TokenInformation,
-} from "pillminder-webclient/src/lib/api";
+import { APIClient, TokenInformation } from "pillminder-webclient/src/lib/api";
 import FormStage from "pillminder-webclient/src/pages/login/FormStage";
 import React from "react";
 
@@ -30,8 +27,9 @@ const validateAccessCode = (value: string) => {
 };
 
 const AccessCodeStage = ({ onValidLogin }: AccessCodeStageProps) => {
+	const client = new APIClient();
 	const submit = ({ accessCode }: FormData) => {
-		return exchangeAccessCode(accessCode).then(onValidLogin);
+		return client.exchangeAccessCode(accessCode).then(onValidLogin);
 	};
 
 	return (

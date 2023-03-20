@@ -1,8 +1,5 @@
 import { HStack, StackDivider } from "@chakra-ui/react";
-import {
-	getStatsSummary,
-	getTakenDates,
-} from "pillminder-webclient/src/lib/api";
+import { APIClient } from "pillminder-webclient/src/lib/api";
 import CardError from "pillminder-webclient/src/pages/_common/CardError";
 import { makeErrorString } from "pillminder-webclient/src/pages/_common/errors";
 import History from "pillminder-webclient/src/pages/stats/History";
@@ -71,14 +68,15 @@ const makeErrorComponent = (
 };
 
 const StatsCardContents = ({ pillminder, token }: StatsCardBodyProps) => {
+	const client = new APIClient(token);
 	const summaryQuery = useQuery({
 		queryKey: ["summary", pillminder, token],
-		queryFn: () => getStatsSummary(token, pillminder),
+		queryFn: () => client.getStatsSummary(pillminder),
 	});
 
 	const historyQuery = useQuery({
 		queryKey: ["history", pillminder, token],
-		queryFn: () => getTakenDates(token, pillminder),
+		queryFn: () => client.getTakenDates(pillminder),
 	});
 
 	const statsBody = (

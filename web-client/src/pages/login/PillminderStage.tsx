@@ -5,7 +5,7 @@ import {
 	Input,
 } from "@chakra-ui/react";
 import { Field, FieldProps } from "formik";
-import { requestAccessCode } from "pillminder-webclient/src/lib/api";
+import { APIClient } from "pillminder-webclient/src/lib/api";
 import FormStage from "pillminder-webclient/src/pages/login/FormStage";
 import React from "react";
 
@@ -26,11 +26,10 @@ const validateRequired = (value: string) => {
 };
 
 const PillminderStage = ({ onAccessCode }: PillminderFormProps) => {
-	const submit = ({ pillminder }: FormData) => {
-		return requestAccessCode(pillminder).then(() => {
-			console.log("next");
-			onAccessCode();
-		});
+	const client = new APIClient();
+	const submit = async ({ pillminder }: FormData) => {
+		await client.requestAccessCode(pillminder);
+		onAccessCode();
 	};
 
 	return (
