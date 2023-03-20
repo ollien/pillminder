@@ -28,8 +28,10 @@ defmodule Pillminder.WebRouter do
         ""
       else
         # If the error has some kind of status code, there's probably something we should send to the user
-        message = Map.get(error, :message, "Internal server error.")
-        %{error: message} |> Poison.encode!()
+        case Map.get(error, :message) do
+          nil -> ""
+          message -> %{error: message} |> Poison.encode!()
+        end
       end
 
     conn =
