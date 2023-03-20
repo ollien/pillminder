@@ -13,7 +13,7 @@ defmodule Pillminder.WebRouter.Auth do
          {:ok, access_code} <- new_access_code(timer_id),
          :ok <- send_access_code(timer_id, access_code) do
       Logger.info("Created access code for timer #{timer_id}")
-      send_resp(conn, 204, "")
+      send_resp(conn, 200, "{}")
     else
       {:error, {:missing_in_body, _key}} ->
         Logger.debug("No pillminder/timer_id found in request")
@@ -26,17 +26,17 @@ defmodule Pillminder.WebRouter.Auth do
       {:error, {:make_access_code, reason}} ->
         # I would log the pillminder here but it isn't defined at this point...
         Logger.error("Failed to generate access code: #{reason}")
-        send_resp(conn, 500, "")
+        send_resp(conn, 500, "{}")
 
       {:error, {:make_access_code, reason}} ->
         # I would log the pillminder here but it isn't defined at this point...
         Logger.error("Failed to generate access code: #{reason}")
-        send_resp(conn, 500, "")
+        send_resp(conn, 500, "{}")
 
       {:error, {:send_access_code, reason}} ->
         # I would log the pillminder here but it isn't defined at this point...
         Logger.error("Failed to send access code: #{reason}")
-        send_resp(conn, 500, "")
+        send_resp(conn, 500, "{}")
     end
   end
 
@@ -63,7 +63,7 @@ defmodule Pillminder.WebRouter.Auth do
       {:error, {:exchange_token, reason}} ->
         # I would log the timer_id here but it isn't defined at this point...
         Logger.error("Failed to exchange access code: #{reason}")
-        send_resp(conn, 500, "")
+        send_resp(conn, 500, "{}")
     end
   end
 

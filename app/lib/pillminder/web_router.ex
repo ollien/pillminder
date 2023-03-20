@@ -1,10 +1,13 @@
 defmodule Pillminder.WebRouter do
   require Logger
 
+  alias Pillminder.WebRouter.Helper.SetContentTypePlug
+
   use Plug.Router
   use Plug.ErrorHandler
 
   plug(Plug.Logger, log: :info)
+  plug(SetContentTypePlug, content_type: "application/json")
 
   if Mix.env() == :dev do
     plug(Plug.Static,
@@ -25,11 +28,11 @@ defmodule Pillminder.WebRouter do
     body =
       if conn.status == 500 do
         # Internal errors are fine to not have a response, I think...
-        ""
+        "{}"
       else
         # If the error has some kind of status code, there's probably something we should send to the user
         case Map.get(error, :message) do
-          nil -> ""
+          nil -> "{}"
           message -> %{error: message} |> Poison.encode!()
         end
       end

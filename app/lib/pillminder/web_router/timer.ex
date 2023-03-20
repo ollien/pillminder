@@ -22,10 +22,10 @@ defmodule Pillminder.WebRouter.Timer do
 
     with :ok <- dismiss_timer(timer_id),
          :ok <- record_taken(timer_id) do
-      send_resp(conn, 204, "")
+      send_resp(conn, 200, "{}")
     else
       {:error, {:dismiss, :not_timing}} ->
-        send_resp(conn, 204, "")
+        send_resp(conn, 200, "{}")
 
       {:error, {:dismiss, _reason}} ->
         send_resp(conn, 500, %{error: "Failed to dismiss timer"} |> Poison.encode!())
@@ -55,7 +55,7 @@ defmodule Pillminder.WebRouter.Timer do
       end
 
       Logger.info("Cleared snoozed timer id #{timer_id} for #{minutes_until.()}")
-      send_resp(conn, 204, "")
+      send_resp(conn, 200, "{}")
     else
       {:error, {:invalid_param, reason, {param, _}}} ->
         msg = ~s(Invalid value for query parameter "#{param}": #{reason})
@@ -76,7 +76,7 @@ defmodule Pillminder.WebRouter.Timer do
   end
 
   match _ do
-    send_resp(conn, 404, "")
+    send_resp(conn, 404, "{}")
   end
 
   @spec dismiss_timer(String.t()) :: :ok | {:error, {:dismiss, any()}}

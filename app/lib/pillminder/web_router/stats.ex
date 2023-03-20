@@ -33,7 +33,7 @@ defmodule Pillminder.WebRouter.Stats do
         send_resp(conn, 404, %{error: msg} |> Poison.encode!())
 
       {:error, _reason} ->
-        send_resp(conn, 500, "")
+        send_resp(conn, 500, "{}")
     end
   end
 
@@ -54,12 +54,12 @@ defmodule Pillminder.WebRouter.Stats do
         send_resp(conn, 404, %{error: msg} |> Poison.encode!())
 
       {:error, _reason} ->
-        send_resp(conn, 500, "")
+        send_resp(conn, 500, "{}")
     end
   end
 
   match _ do
-    send_resp(conn, 404, "")
+    send_resp(conn, 404, "{}")
   end
 
   @spec get_date(Timex.Types.valid_timezone()) ::
