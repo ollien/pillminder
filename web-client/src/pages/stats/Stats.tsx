@@ -40,7 +40,8 @@ const Stats = ({ pillminder, token }: StatsProps) => {
 	const propErrorComponent = propError ? (
 		<CardError>{propError}</CardError>
 	) : null;
-	const buildBody = () => (
+
+	const cardBody = (
 		<ErrorBoundary FallbackComponent={BoundaryError}>
 			{/*
 				Typescript isn't smart enough to see this, but if we're rendering
@@ -49,6 +50,7 @@ const Stats = ({ pillminder, token }: StatsProps) => {
 			<StatsCardContents pillminder={pillminder!} token={token!} />
 		</ErrorBoundary>
 	);
+
 	return (
 		<CardPage maxWidth="container.md">
 			<CardHeader>
@@ -56,7 +58,7 @@ const Stats = ({ pillminder, token }: StatsProps) => {
 					{getHeadingMsg(pillminder)}
 				</Heading>
 			</CardHeader>
-			<CardBody width="100%">{propErrorComponent ?? buildBody()}</CardBody>
+			<CardBody width="100%">{propErrorComponent ?? cardBody}</CardBody>
 		</CardPage>
 	);
 };
