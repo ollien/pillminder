@@ -44,22 +44,10 @@ const makeConsolidatedFetchError = (
 	return fetchErrors[0]!;
 };
 
-const makeErrorComponentMessage = (
-	...fetchErrors: (string | null)[]
-): string | null => {
-	const consolidatedFetchError = makeConsolidatedFetchError(...fetchErrors);
-	if (consolidatedFetchError) {
-		// We know from the `every` that this must be non-null.
-		return consolidatedFetchError;
-	}
-
-	return null;
-};
-
 const makeErrorComponent = (
 	...fetchErrors: (string | null)[]
 ): JSX.Element | null => {
-	const errorMsg = makeErrorComponentMessage(...fetchErrors);
+	const errorMsg = makeConsolidatedFetchError(...fetchErrors);
 	if (errorMsg == null) {
 		return null;
 	}
