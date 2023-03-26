@@ -6,7 +6,8 @@ import Controls from "pillminder-webclient/src/pages/stats/Controls";
 import History from "pillminder-webclient/src/pages/stats/History";
 import Loadable from "pillminder-webclient/src/pages/stats/Loadable";
 import Summary from "pillminder-webclient/src/pages/stats/Summary";
-import React from "react";
+import { AuthContext } from "pillminder-webclient/src/pages/stats/auth_context";
+import React, { useContext } from "react";
 import {
 	useMutation,
 	useQuery,
@@ -14,10 +15,7 @@ import {
 	UseQueryResult,
 } from "react-query";
 
-interface StatsCardBodyProps {
-	pillminder: string;
-	token: string;
-}
+const INVALID_TOKEN_ERROR = "Your session has expired. Please log in again";
 
 const makeQueryError = <T, E>(
 	query: UseQueryResult<T, E>,
@@ -61,25 +59,31 @@ const makeErrorComponent = (
 	return <CardError>{errorMsg}</CardError>;
 };
 
-const StatsCardContents = ({ pillminder, token }: StatsCardBodyProps) => {
+const StatsCardContents = () => {
+	const authContext = useContext(AuthContext);
+	if (!authContext) {
+		// This shouldn't happen during normal operation, and the error boundary above this will catch it
+		throw Error(INVALID_TOKEN_ERROR);
+	}
+
 	const queryClient = useQueryClient();
-	const apiClient = new APIClient(token);
+	const apiClient = new APIClient(authContext.token);
 	const summaryQuery = useQuery({
-		queryKey: ["summary", pillminder, token],
-		queryFn: () => apiClient.getStatsSummary(pillminder),
+		queryKey: ["summary", authContext.pillminder, authContext.token],
+		queryFn: () => apiClient.getStatsSummary(authContext.pillminder),
 	});
 
 	const historyQuery = useQuery({
-		queryKey: ["history", pillminder, token],
-		queryFn: () => apiClient.getTakenDates(pillminder),
+		queryKey: ["history", authContext.pillminder, authContext.token],
+		queryFn: () => apiClient.getTakenDates(authContext.pillminder),
 	});
 
 	const markTakenMutation = useMutation({
-		mutationFn: () => apiClient.markTodayAsTaken(pillminder),
+		mutationFn: () => apiClient.markTodayAsTaken(authContext.pillminder),
 	});
 
 	const markSkippedMutation = useMutation({
-		mutationFn: () => apiClient.skipToday(pillminder),
+		mutationFn: () => apiClient.skipToday(authContext.pillminder),
 	});
 
 	const statsBody = (

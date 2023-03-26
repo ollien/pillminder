@@ -1,16 +1,22 @@
 import Stats from "./Stats";
 import { ChakraProvider } from "@chakra-ui/react";
 import { APIError } from "pillminder-webclient/src/lib/api";
+import {
+	AuthContext,
+	AuthContextData,
+} from "pillminder-webclient/src/pages/stats/auth_context";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "react-query";
 
-const getPillminder = (): string | undefined => {
-	return localStorage.getItem("pillminder") ?? undefined;
-};
+const buildAuthContext = (): AuthContextData | null => {
+	const pillminder = localStorage.getItem("pillminder");
+	const token = localStorage.getItem("token");
+	if (!(pillminder && token)) {
+		return null;
+	}
 
-const getToken = (): string | undefined => {
-	return localStorage.getItem("token") ?? undefined;
+	return { pillminder, token };
 };
 
 const rootElement = document.getElementById("root");
@@ -37,7 +43,9 @@ const queryClient = new QueryClient({
 reactRoot.render(
 	<ChakraProvider>
 		<QueryClientProvider client={queryClient}>
-			<Stats pillminder={getPillminder()} token={getToken()} />
+			<AuthContext.Provider value={buildAuthContext()}>
+				<Stats />
+			</AuthContext.Provider>
 		</QueryClientProvider>
 	</ChakraProvider>
 );
