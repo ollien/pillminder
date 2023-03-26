@@ -7,6 +7,7 @@ defmodule Pillminder.Scheduler do
   require Logger
 
   alias Pillminder.Scheduler.ScheduledReminder
+  alias Pillminder.Scheduler.SkipDate
   alias Pillminder.Util
   use Supervisor
 
@@ -25,6 +26,7 @@ defmodule Pillminder.Scheduler do
   def init({reminders, opts}) do
     children = [
       {Task.Supervisor, name: @task_supervisor_name},
+      {SkipDate, {reminders, clock_source: Keyword.get(opts, :clock_source)}},
       {Task, fn -> schedule_reminders(reminders, opts) end}
     ]
 
@@ -52,6 +54,20 @@ defmodule Pillminder.Scheduler do
       {:ok, ms_until} = get_ms_until(now, schedule_time)
       schedule_reminder(reminder, ms_until, reminder_clock_source)
     end)
+  end
+
+  @spec dont_remind_today(String.t()) :: :ok | {:error, :no_such_timer}
+  def dont_remind_today(timer_id) do
+    Logger.info("Preventing further reminders for today on #{timer_id}")
+
+    SkipDate.skip_date(timer_id)
+  end
+
+  @spec dont_remind_today(String.t(), Date.t()) :: :ok | {:error, :no_such_timer}
+  def dont_remind_today(timer_id, today) do
+    Logger.info("Preventing further reminders for today on #{timer_id}")
+
+    SkipDate.skip_date(timer_id, today)
   end
 
   @spec get_next_scheduleable_time(reminder :: ScheduledReminder.t(), now :: DateTime.t()) ::
@@ -118,7 +134,14 @@ defmodule Pillminder.Scheduler do
 
   @spec run_and_reschedule(ScheduledReminder.t(), clock_source()) :: nil
   defp run_and_reschedule(reminder, clock_source) do
-    run_reminder_task(reminder)
+    today = clock_source.() |> Timex.to_date()
+
+    if SkipDate.is_skipped(reminder.id, today) do
+      Logger.info("Reminder task for \"#{reminder.id}\" was skipped for today.")
+    else
+      run_reminder_task(reminder)
+    end
+
     run_reschedule_task(reminder, clock_source)
   end
 

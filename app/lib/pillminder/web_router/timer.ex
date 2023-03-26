@@ -1,6 +1,7 @@
 defmodule Pillminder.WebRouter.Timer do
   require Logger
 
+  alias Pillminder.Scheduler
   alias Pillminder.Config
   alias Pillminder.Stats
   alias Pillminder.Util
@@ -20,23 +21,27 @@ defmodule Pillminder.WebRouter.Timer do
   delete "/:timer_id" do
     Helper.Auth.authorize_request(conn, timer_id)
 
+    err_msgs = %{
+      dismiss: "Failed to dismiss timer",
+      recording: "Failed to record medication as taken, but timer was dismissed.",
+      skip:
+        "Failed finalize timer dismissal; medication is marked as taken, but duplicate notifications may appear."
+    }
+
     with :ok <- dismiss_timer(timer_id),
-         :ok <- record_taken(timer_id) do
+         :ok <- record_taken(timer_id),
+         :ok <- skip_other_timers_today(timer_id) do
       send_resp(conn, 200, "{}")
     else
-      {:error, {:dismiss, :not_timing}} ->
-        send_resp(conn, 200, "{}")
+      {:error, {stage, _reason}} ->
+        # Dialyzer doesn't like handling our stages in multiple with clauses here,
+        # so I use this map to get around the limitation
+        #
+        # https://dev.to/lasseebert/til-understanding-dialyzer-s-the-pattern-can-never-match-the-type-2mmm
 
-      {:error, {:dismiss, _reason}} ->
-        send_resp(conn, 500, %{error: "Failed to dismiss timer"} |> Poison.encode!())
+        msg = Map.get(err_msgs, stage, "Unknown error ocurred during timer dismissal")
 
-      {:error, {:recording, _reason}} ->
-        send_resp(
-          conn,
-          500,
-          %{error: "Failed to record medication as taken, but timer was dismissed."}
-          |> Poison.encode!()
-        )
+        send_resp(conn, 500, %{error: msg} |> Poison.encode!())
     end
   end
 
@@ -88,11 +93,26 @@ defmodule Pillminder.WebRouter.Timer do
 
       {:error, :not_timing} ->
         Logger.debug("Attempted to dismiss timer id #{timer_id} but no timers are running")
-        {:error, {:dismiss, :not_timing}}
+        # If you dismiss something before it starts, that's fine.
+        :ok
 
       {:error, reason} ->
         Logger.error("Failed to dismiss timer with id #{timer_id}: #{inspect(reason)}")
         {:error, {:dismiss, reason}}
+    end
+  end
+
+  defp skip_other_timers_today(timer_id) do
+    case Scheduler.dont_remind_today(timer_id) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        Logger.error(
+          "Failed to ensure today's timers would be stopped for #{timer_id}; duplicate reminders may appear: #{inspect(reason)}"
+        )
+
+        {:error, {:skip, reason}}
     end
   end
 
