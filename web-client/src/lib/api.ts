@@ -85,6 +85,11 @@ class BadResponseFormatError extends APIError {
 	}
 }
 
+enum WasTaken {
+	NOT_TAKEN,
+	TAKEN,
+}
+
 export class APIClient {
 	private static readonly FALLBACK_ERROR = "Failed to perform action";
 
@@ -229,6 +234,14 @@ export class APIClient {
 		}));
 	}
 
+	async markTodayAsTaken(pillminder: string): Promise<void> {
+		await this.deleteTimer(pillminder, WasTaken.TAKEN);
+	}
+
+	async skipToday(pillminder: string): Promise<void> {
+		await this.deleteTimer(pillminder, WasTaken.NOT_TAKEN);
+	}
+
 	private makeAuthenticatedHTTPClient(token: string): AxiosInstance {
 		return this.makeHttpClient({
 			headers: {
@@ -365,6 +378,25 @@ export class APIClient {
 
 		const msg = codes[statusCode] ?? responseErrorMessage ?? fallback;
 		throw error.withMessage(msg);
+	}
+
+	private async deleteTimer(pillminder: string, taken: WasTaken) {
+		if (!this.authenticatedClient) {
+			// We have no token, so we have an invalid token
+			throw new APIError(INVALID_TOKEN_ERROR);
+		}
+
+		await this.authenticatedClient
+			.delete(`/api/v1/timer/${encodeURIComponent(pillminder)}`, {
+				params: { taken: taken == WasTaken.TAKEN },
+			})
+			.catch((error) => {
+				throw this.refineErrorMessage(
+					error,
+					{ 404: INVALID_TOKEN_ERROR },
+					"Failed to mark as taken"
+				);
+			});
 	}
 
 	private parseDate(date: null): null;

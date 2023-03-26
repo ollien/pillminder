@@ -1,12 +1,18 @@
-import { HStack, StackDivider } from "@chakra-ui/react";
+import { HStack, Stack, StackDivider } from "@chakra-ui/react";
 import { APIClient } from "pillminder-webclient/src/lib/api";
 import CardError from "pillminder-webclient/src/pages/_common/CardError";
 import { makeErrorString } from "pillminder-webclient/src/pages/_common/errors";
+import Controls from "pillminder-webclient/src/pages/stats/Controls";
 import History from "pillminder-webclient/src/pages/stats/History";
 import Loadable from "pillminder-webclient/src/pages/stats/Loadable";
 import Summary from "pillminder-webclient/src/pages/stats/Summary";
 import React from "react";
-import { useQuery, UseQueryResult } from "react-query";
+import {
+	useMutation,
+	useQuery,
+	useQueryClient,
+	UseQueryResult,
+} from "react-query";
 
 interface StatsCardBodyProps {
 	pillminder: string;
@@ -56,15 +62,24 @@ const makeErrorComponent = (
 };
 
 const StatsCardContents = ({ pillminder, token }: StatsCardBodyProps) => {
-	const client = new APIClient(token);
+	const queryClient = useQueryClient();
+	const apiClient = new APIClient(token);
 	const summaryQuery = useQuery({
 		queryKey: ["summary", pillminder, token],
-		queryFn: () => client.getStatsSummary(pillminder),
+		queryFn: () => apiClient.getStatsSummary(pillminder),
 	});
 
 	const historyQuery = useQuery({
 		queryKey: ["history", pillminder, token],
-		queryFn: () => client.getTakenDates(pillminder),
+		queryFn: () => apiClient.getTakenDates(pillminder),
+	});
+
+	const markTakenMutation = useMutation({
+		mutationFn: () => apiClient.markTodayAsTaken(pillminder),
+	});
+
+	const markSkippedMutation = useMutation({
+		mutationFn: () => apiClient.skipToday(pillminder),
 	});
 
 	const statsBody = (
@@ -89,12 +104,31 @@ const StatsCardContents = ({ pillminder, token }: StatsCardBodyProps) => {
 		</HStack>
 	);
 
+	const controls = (
+		<Controls
+			onMarkedTaken={async () => {
+				await markTakenMutation.mutateAsync();
+				queryClient.invalidateQueries();
+			}}
+			onSkipped={async () => {
+				await markSkippedMutation.mutateAsync();
+			}}
+		/>
+	);
+
+	const cardBody = (
+		<Stack>
+			{statsBody}
+			{controls}
+		</Stack>
+	);
+
 	const errorComponent = makeErrorComponent(
 		makeQueryError(summaryQuery),
 		makeQueryError(historyQuery)
 	);
 
-	return errorComponent ?? statsBody;
+	return errorComponent ?? cardBody;
 };
 
 export default StatsCardContents;
