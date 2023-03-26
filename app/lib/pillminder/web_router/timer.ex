@@ -13,6 +13,7 @@ defmodule Pillminder.WebRouter.Timer do
   plug(:match)
   plug(:dispatch)
 
+  @taken_param "taken"
   @snooze_time_param "snooze_time"
   @default_snooze_time Timex.Duration.from_hours(1)
                        |> Timex.Duration.to_milliseconds(truncate: true)
@@ -21,23 +22,37 @@ defmodule Pillminder.WebRouter.Timer do
   delete "/:timer_id" do
     Helper.Auth.authorize_request(conn, timer_id)
 
-    err_msgs = %{
-      dismiss: "Failed to dismiss timer",
-      recording: "Failed to record medication as taken, but timer was dismissed.",
-      skip:
-        "Failed finalize timer dismissal; medication is marked as taken, but duplicate notifications may appear."
-    }
+    conn = fetch_query_params(conn)
 
-    with :ok <- dismiss_timer(timer_id),
-         :ok <- record_taken(timer_id),
+    with {:ok, params} <- parse_mark_taken_query_params(conn.query_params),
+         taken = Map.get(params, "taken", true),
+         _ =
+           do_if(not taken, fn ->
+             Logger.info(
+               "#{timer_id} will be marked as not taken, and its timers skipped for today"
+             )
+           end),
+         :ok <- dismiss_timer(timer_id),
+         :ok <- do_if(taken, fn -> record_taken(timer_id) end),
          :ok <- skip_other_timers_today(timer_id) do
       send_resp(conn, 200, "{}")
     else
+      {:error, {:invalid_param, reason, {param, _}}} ->
+        msg = ~s(Invalid value for query parameter "#{param}": #{reason})
+        Logger.debug(msg)
+        send_resp(conn, 400, %{error: msg} |> Poison.encode!())
+
       {:error, {stage, _reason}} ->
         # Dialyzer doesn't like handling our stages in multiple with clauses here,
         # so I use this map to get around the limitation
         #
         # https://dev.to/lasseebert/til-understanding-dialyzer-s-the-pattern-can-never-match-the-type-2mmm
+        err_msgs = %{
+          dismiss: "Failed to dismiss timer",
+          recording: "Failed to record medication as taken, but timer was dismissed.",
+          skip:
+            "Failed finalize timer dismissal; medication is marked as taken, but duplicate notifications may appear."
+        }
 
         msg = Map.get(err_msgs, stage, "Unknown error ocurred during timer dismissal")
 
@@ -48,7 +63,7 @@ defmodule Pillminder.WebRouter.Timer do
   post "/:timer_id/snooze" do
     Helper.Auth.authorize_request(conn, timer_id)
 
-    conn = Plug.Conn.fetch_query_params(conn)
+    conn = fetch_query_params(conn)
 
     with {:ok, params} <- parse_snooze_query_params(conn.query_params),
          snooze_ms = Map.get(params, @snooze_time_param),
@@ -139,23 +154,23 @@ defmodule Pillminder.WebRouter.Timer do
     end
   end
 
+  @spec parse_mark_taken_query_params(%{String.t() => String.t()}) ::
+          {:ok, %{String.t() => any()}}
+          | {:error, {atom, String.t(), {String.t(), String.t()}}}
+  defp parse_mark_taken_query_params(params = %{}) do
+    parse_single_param(params, @taken_param, fn
+      nil -> {:ok, true}
+      "true" -> {:ok, true}
+      "false" -> {:ok, false}
+      taken_value -> {:error, {:invalid_param, "invalid boolean", {@taken_param, taken_value}}}
+    end)
+  end
+
   @spec parse_snooze_query_params(%{String.t() => String.t()}) ::
-          {:ok, %{String.t() => String.t()}}
+          {:ok, %{String.t() => any()}}
           | {:error, {atom, String.t(), {String.t(), String.t()}}}
   defp parse_snooze_query_params(params = %{}) do
-    with {:ok, value} <- Util.QueryParam.get_value(params, @snooze_time_param),
-         {:ok, snooze_time} <- parse_snooze_time_param(value) do
-      parsed_params = Map.put(params, @snooze_time_param, snooze_time)
-      {:ok, parsed_params}
-    else
-      {:error, :not_scalar} ->
-        {:error,
-         {:invalid_param, "must be a string",
-          {@snooze_time_param, Map.get(params, @snooze_time_param)}}}
-
-      err = {:error, _reason} ->
-        err
-    end
+    parse_single_param(params, @snooze_time_param, &parse_snooze_time_param/1)
   end
 
   defp parse_snooze_time_param(nil) do
@@ -177,6 +192,27 @@ defmodule Pillminder.WebRouter.Timer do
     end
   end
 
+  @spec parse_single_param(
+          params :: %{String.t() => String.t()},
+          param_name :: String.t(),
+          convert_func :: (String.t() | nil -> {:ok, any()} | {:error, any()})
+        ) ::
+          {:ok, %{String.t() => any()}}
+          | {:error, {atom, String.t(), {String.t(), String.t()}}}
+  defp parse_single_param(params = %{}, param_name, parse_func) do
+    with {:ok, value} <- Util.QueryParam.get_value(params, param_name),
+         {:ok, parsed} <- parse_func.(value) do
+      parsed_params = Map.put(params, param_name, parsed)
+      {:ok, parsed_params}
+    else
+      {:error, :not_scalar} ->
+        {:error, {:invalid_param, "must be a string", {param_name, Map.get(params, param_name)}}}
+
+      err = {:error, _reason} ->
+        err
+    end
+  end
+
   @spec(
     get_tz_for_timer(String.t()) :: {:ok, Timex.Types.valid_timezone()},
     {:error, :no_such_timer}
@@ -189,5 +225,14 @@ defmodule Pillminder.WebRouter.Timer do
       nil -> {:error, :no_such_timer}
       %Config.Timer{reminder_time_zone: zone} -> {:ok, zone}
     end
+  end
+
+  @spec do_if(boolean, (() -> t)) :: :ok | t when t: any
+  defp do_if(true, func) do
+    func.()
+  end
+
+  defp do_if(false, _func) do
+    :ok
   end
 end
