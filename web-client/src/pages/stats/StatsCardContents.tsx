@@ -1,3 +1,4 @@
+import { SettingsIcon } from "@chakra-ui/icons";
 import { HStack, Stack, StackDivider } from "@chakra-ui/react";
 import { APIClient } from "pillminder-webclient/src/lib/api";
 import CardError from "pillminder-webclient/src/pages/_common/CardError";
@@ -9,6 +10,7 @@ import Controls, {
 	ControlStatus,
 } from "pillminder-webclient/src/pages/stats/Controls";
 import History from "pillminder-webclient/src/pages/stats/History";
+import IconMenu from "pillminder-webclient/src/pages/stats/IconMenu";
 import Loadable from "pillminder-webclient/src/pages/stats/Loadable";
 import Summary from "pillminder-webclient/src/pages/stats/Summary";
 import { AuthContext } from "pillminder-webclient/src/pages/stats/auth_context";
@@ -115,14 +117,13 @@ const useControl = <T,>(
 	);
 };
 
-const StatsCardContents = () => {
+const StatsBody = () => {
 	const authContext = useContext(AuthContext);
 	if (!authContext) {
 		// This shouldn't happen during normal operation, and the error boundary above this will catch it
 		throw Error(INVALID_TOKEN_ERROR);
 	}
 
-	const queryClient = useQueryClient();
 	const apiClient = new APIClient(authContext.token);
 	const summaryQuery = useQuery({
 		queryKey: ["summary", authContext.pillminder, authContext.token],
@@ -134,15 +135,7 @@ const StatsCardContents = () => {
 		queryFn: () => apiClient.getTakenDates(authContext.pillminder),
 	});
 
-	const markTakenMutation = useMutation({
-		mutationFn: () => apiClient.markTodayAsTaken(authContext.pillminder),
-	});
-
-	const markSkippedMutation = useMutation({
-		mutationFn: () => apiClient.skipToday(authContext.pillminder),
-	});
-
-	const statsBody = (
+	const cardBody = (
 		<HStack
 			divider={<StackDivider />}
 			justifyContent="space-evenly"
@@ -164,6 +157,32 @@ const StatsCardContents = () => {
 		</HStack>
 	);
 
+	const errorComponent = makeErrorComponent(
+		makeQueryError(summaryQuery),
+		makeQueryError(historyQuery)
+	);
+
+	return errorComponent ?? cardBody;
+};
+
+const ControlsMenu = () => {
+	const authContext = useContext(AuthContext);
+	if (!authContext) {
+		// This shouldn't happen during normal operation, and the error boundary above this will catch it
+		throw Error(INVALID_TOKEN_ERROR);
+	}
+
+	const apiClient = new APIClient(authContext.token);
+	const queryClient = useQueryClient();
+
+	const markTakenMutation = useMutation({
+		mutationFn: () => apiClient.markTodayAsTaken(authContext.pillminder),
+	});
+
+	const markSkippedMutation = useMutation({
+		mutationFn: () => apiClient.skipToday(authContext.pillminder),
+	});
+
 	const markTakenControl = useControl(
 		() => ({
 			status: mutationToControlStatus(markTakenMutation),
@@ -184,22 +203,19 @@ const StatsCardContents = () => {
 	);
 
 	const controls = (
-		<Controls markTaken={markTakenControl} markSkipped={markSkippedControl} />
+		<IconMenu icon={<SettingsIcon />}>
+			<Controls markTaken={markTakenControl} markSkipped={markSkippedControl} />
+		</IconMenu>
 	);
 
-	const cardBody = (
-		<Stack>
-			{statsBody}
-			{controls}
-		</Stack>
-	);
-
-	const errorComponent = makeErrorComponent(
-		makeQueryError(summaryQuery),
-		makeQueryError(historyQuery)
-	);
-
-	return errorComponent ?? cardBody;
+	return controls;
 };
+
+const StatsCardContents = () => (
+	<Stack>
+		<StatsBody />
+		<ControlsMenu />
+	</Stack>
+);
 
 export default StatsCardContents;
