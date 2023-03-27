@@ -1,0 +1,40 @@
+on: [push]
+
+name: Push
+jobs:
+  # Due to the caching in the dockerfile, we can't easily reuse it to run tests,
+  # so we will set up the environment entirely in actions
+  server_tests:
+    name: API Server Unit Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: 25
+          elixir-version: "1.14"
+      - name: Fetch dependencies
+        run: mix deps.get
+      - name: Run tests
+        run: mix test
+
+  server_build:
+    name: Check Server Container Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Build container
+        run: docker build -f docker/app/Dockerfile .
+
+  web_build:
+    name: Check Web Container Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Build container
+        run: docker build -f docker/web/Dockerfile .
