@@ -50,7 +50,7 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
   end
 
   @doc """
-  Stop the timer agent. See `Agent.stop/3` for more details.
+  Stop the timer agent. See `GenServer.stop/3` for more details.
   """
   @spec stop(Agent.agent(), atom, non_neg_integer | :infinity) :: any
   def stop(agent, reason \\ :normal, timeout \\ 5000) do
@@ -58,7 +58,7 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
   end
 
   @doc """
-  Snooze the current timer
+  Snooze the current timer fo ra given number of milliseconds..
   """
   @spec snooze(GenServer.name(), non_neg_integer) :: :ok
   def snooze(destination, snooze_ms) do
