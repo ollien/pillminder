@@ -1,33 +1,91 @@
-import { Button, Stack } from "@chakra-ui/react";
+import { CheckIcon, WarningIcon } from "@chakra-ui/icons";
+import { Button, Fade, Stack } from "@chakra-ui/react";
 import React from "react";
+import { BeatLoader } from "react-spinners";
+
+interface IdleControlStatus {
+	status: "idle";
+}
+
+interface LoadingControlStatus {
+	status: "loading";
+}
+
+interface CompleteControlStatus {
+	status: "complete";
+}
+
+interface FailedControlStatus {
+	status: "error";
+	error: string;
+}
+
+interface Control {
+	status: ControlStatus;
+	onAction: () => void;
+}
 
 interface ControlProps {
-	onMarkedTaken: () => void;
-	onSkipped: () => void;
+	markTaken: Control;
+	markSkipped: Control;
 }
 
 interface ControlButtonProps {
 	color: string;
-	onClick: () => void;
+	control: Control;
 }
+
+const getControlIcon = (
+	status: ControlStatus
+): React.ReactElement | undefined => {
+	switch (status.status) {
+		case "error":
+			return <WarningIcon />;
+		case "complete":
+			return <CheckIcon />;
+		default:
+			return undefined;
+	}
+};
+
+/**
+ * The status of an individual control
+ */
+export type ControlStatus =
+	| IdleControlStatus
+	| LoadingControlStatus
+	| CompleteControlStatus
+	| FailedControlStatus;
 
 const ControlButton = ({
 	color,
-	onClick,
+	control,
 	children,
-}: React.PropsWithChildren<ControlButtonProps>) => (
-	<Button colorScheme={color} variant="outline" onClick={onClick}>
-		{children}
-	</Button>
-);
+}: React.PropsWithChildren<ControlButtonProps>) => {
+	const loader = <BeatLoader size={8} color={color} />;
+	const controlIcon = <Fade in={true}>{getControlIcon(control.status)}</Fade>;
 
-const Controls = ({ onMarkedTaken, onSkipped }: ControlProps) => (
+	return (
+		<Button
+			colorScheme={color}
+			variant="outline"
+			onClick={control.onAction}
+			leftIcon={controlIcon}
+			isLoading={control.status.status === "loading"}
+			spinner={loader}
+		>
+			{children}
+		</Button>
+	);
+};
+
+const Controls = (controls: ControlProps) => (
 	<Stack justifyContent="center">
-		<ControlButton color="teal" onClick={onMarkedTaken}>
+		<ControlButton color="teal" control={controls.markTaken}>
 			Mark taken
 		</ControlButton>
 
-		<ControlButton color="red" onClick={onSkipped}>
+		<ControlButton color="red" control={controls.markSkipped}>
 			Skip today
 		</ControlButton>
 	</Stack>

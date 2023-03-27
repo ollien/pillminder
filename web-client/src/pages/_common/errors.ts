@@ -7,3 +7,11 @@ export function makeErrorString(err: Error | unknown): string {
 		return `${err}`;
 	}
 }
+
+/**
+ * Assert that a given branch is unreachable. This is primarily intended to be used for type checking, but can
+ * assert at runtime.
+ */
+export function assertUnreachable<T>(x: never): T {
+	throw Error(`assertUnreachable was called with ${x}`);
+}

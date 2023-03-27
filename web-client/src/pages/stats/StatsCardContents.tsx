@@ -1,15 +1,21 @@
 import { HStack, Stack, StackDivider } from "@chakra-ui/react";
 import { APIClient } from "pillminder-webclient/src/lib/api";
 import CardError from "pillminder-webclient/src/pages/_common/CardError";
-import { makeErrorString } from "pillminder-webclient/src/pages/_common/errors";
-import Controls from "pillminder-webclient/src/pages/stats/Controls";
+import {
+	assertUnreachable,
+	makeErrorString,
+} from "pillminder-webclient/src/pages/_common/errors";
+import Controls, {
+	ControlStatus,
+} from "pillminder-webclient/src/pages/stats/Controls";
 import History from "pillminder-webclient/src/pages/stats/History";
 import Loadable from "pillminder-webclient/src/pages/stats/Loadable";
 import Summary from "pillminder-webclient/src/pages/stats/Summary";
 import { AuthContext } from "pillminder-webclient/src/pages/stats/auth_context";
-import React, { useContext } from "react";
+import React, { useContext, useMemo } from "react";
 import {
 	useMutation,
+	UseMutationResult,
 	useQuery,
 	useQueryClient,
 	UseQueryResult,
@@ -57,6 +63,56 @@ const makeErrorComponent = (
 	}
 
 	return <CardError>{errorMsg}</CardError>;
+};
+
+const mutationToControlStatus = <
+	MutationData,
+	MutationError,
+	MutationVariables,
+	MutationContext
+>(
+	mutation: UseMutationResult<
+		MutationData,
+		MutationError,
+		MutationVariables,
+		MutationContext
+	>
+): ControlStatus => {
+	const status = mutation.status;
+
+	switch (status) {
+		case "idle":
+			return { status: "idle" };
+		case "loading":
+			return { status: "loading" };
+		case "success":
+			return { status: "complete" };
+		case "error":
+			return {
+				status: "error",
+				error: makeErrorString(mutation.error),
+			};
+		default:
+			return assertUnreachable(status);
+	}
+};
+
+const useControl = <T,>(
+	fn: () => T,
+	// This is necessary, otherwise we can't pass a mutation (given the default is "unknown")
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	mutation: UseMutationResult<any, any, any, any>,
+	extraDeps: unknown[] = []
+): T => {
+	return useMemo(
+		fn,
+		// We only need to re-render if the status of the mutation changes.
+		// Asking for "fn" to be a dependency of the render is just going to
+		// cause constant re-renders, as every render the fn will be different.
+		//
+		// eslint-disable-next-line: react-hooks/exhaustive-deps
+		[fn, mutation.status, ...extraDeps]
+	);
 };
 
 const StatsCardContents = () => {
@@ -108,16 +164,27 @@ const StatsCardContents = () => {
 		</HStack>
 	);
 
-	const controls = (
-		<Controls
-			onMarkedTaken={async () => {
+	const markTakenControl = useControl(
+		() => ({
+			status: mutationToControlStatus(markTakenMutation),
+			onAction: async () => {
 				await markTakenMutation.mutateAsync();
 				queryClient.invalidateQueries();
-			}}
-			onSkipped={async () => {
-				await markSkippedMutation.mutateAsync();
-			}}
-		/>
+			},
+		}),
+		markTakenMutation
+	);
+
+	const markSkippedControl = useControl(
+		() => ({
+			status: mutationToControlStatus(markSkippedMutation),
+			onAction: () => markSkippedMutation.mutate(),
+		}),
+		markSkippedMutation
+	);
+
+	const controls = (
+		<Controls markTaken={markTakenControl} markSkipped={markSkippedControl} />
 	);
 
 	const cardBody = (

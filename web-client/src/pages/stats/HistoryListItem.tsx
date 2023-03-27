@@ -1,4 +1,5 @@
 import { As, ListIcon, ListItem } from "@chakra-ui/react";
+import { assertUnreachable } from "pillminder-webclient/src/pages/_common/errors";
 import React from "react";
 import {
 	AiOutlineCheckCircle,
@@ -16,10 +17,6 @@ interface HistoryListItemProps {
 	status: Status;
 	label: string;
 }
-
-const assertUnreachable = <T,>(x: never): T => {
-	throw Error(`assertUnreachable was called with ${x}`);
-};
 
 const colorForStatus = (status: Status): string => {
 	switch (status) {
