@@ -28,6 +28,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Build container
+        env:
+          DOCKER_BUILDKIT: 1
         run: docker build -f docker/app/Dockerfile .
 
   web_build:
@@ -37,4 +39,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Build container
+        env:
+          DOCKER_BUILDKIT: 1
         run: docker build -f docker/web/Dockerfile .
