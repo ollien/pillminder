@@ -8,3 +8,6 @@ config :tzdata,
   http_client: nil
 
 config :pillminder, Pillminder.Stats.Repo, pool: Ecto.Adapters.SQL.Sandbox
+
+config :timex,
+  local_timezone: "UTC"
