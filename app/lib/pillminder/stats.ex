@@ -204,8 +204,8 @@ defmodule Pillminder.Stats do
           taken_at: entry.taken_at,
           last_taken_at: entry.last_taken_at,
           gap:
-            fragment("julianday(?)", entry.taken_at) -
-              fragment("julianday(?)", entry.last_taken_at)
+            fragment("CAST(JULIANDAY(?) AS INTEGER)", entry.taken_at) -
+              fragment("CAST(JULIANDAY(?) AS INTEGER)", entry.last_taken_at)
         }
       )
       |> Ecto.Query.order_by(desc: :taken_at)
@@ -216,9 +216,7 @@ defmodule Pillminder.Stats do
     # gets converted to a string for some reason.
     |> Ecto.Query.select([entry], %{taken_at: entry.taken_at})
     # Either it will be the last entry (indicating a nil gap), or there will be a space between two days
-    # (a space in the interval [0, 2) is acceptable though, as we may have just taken it a bit late on the next day,
-    # making it, for instance, 1.5 days apart, which is fine)
-    |> Ecto.Query.where([entry], is_nil(entry.gap) or entry.gap >= 2)
+    |> Ecto.Query.where([entry], is_nil(entry.gap) or entry.gap > 1)
     |> Ecto.Query.limit(1)
     |> Repo.one()
     |> case do
