@@ -12,6 +12,8 @@ defmodule Pillminder.ReminderSender.TimerManager do
   @timer_supervisor_name __MODULE__.TimerSupervisor
   @registry_name __MODULE__.Registry
 
+  @type stop_func :: (() -> boolean())
+
   @spec start_link(any) :: Supervisor.on_start()
   def start_link(_init) do
     Supervisor.start_link(__MODULE__, :no_arg, name: __MODULE__)
@@ -30,13 +32,15 @@ defmodule Pillminder.ReminderSender.TimerManager do
   @doc """
   Start a reminder timer that will call send_reminder_fn every interval. The task will be supervised, but will
   not be restarted after a timer cancel.
+
+  If a stop_func is provided, it will stop reminding once that function returns true.]
   """
-  @spec start_reminder_timer(any(), number, SendServer.remind_func()) ::
+  @spec start_reminder_timer(any(), number, SendServer.remind_func(), stop_func()) ::
           :ok | {:error, any}
-  def start_reminder_timer(id, interval, send_reminder_fn) do
+  def start_reminder_timer(id, interval, send_reminder_fn, stop_func \\ &never_stop/0) do
     reminder_timer_child_spec =
       Supervisor.child_spec(
-        {ReminderTimer, {id, interval, send_reminder_fn, [name: make_via_tuple(id)]}},
+        {ReminderTimer, {id, interval, send_reminder_fn, stop_func, [name: make_via_tuple(id)]}},
         restart: :transient
       )
 
@@ -74,5 +78,9 @@ defmodule Pillminder.ReminderSender.TimerManager do
 
   defp make_via_tuple(id) do
     {:via, Registry, {@registry_name, id}}
+  end
+
+  defp never_stop() do
+    false
   end
 end

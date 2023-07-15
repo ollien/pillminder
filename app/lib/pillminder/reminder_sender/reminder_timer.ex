@@ -9,13 +9,14 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
   use GenServer
 
   defmodule State do
-    @enforce_keys [:timer, :interval, :remind_func, :task_supervisor]
-    defstruct [:timer, :interval, :remind_func, :task_supervisor]
+    @enforce_keys [:timer, :interval, :remind_func, :stop_func, :task_supervisor]
+    defstruct [:timer, :interval, :remind_func, :stop_func, :task_supervisor]
 
     @type t() :: %__MODULE__{
             timer: {:interval_timer | :snoozed_timer, :timer.tref()},
             interval: non_neg_integer(),
-            remind_func: (() -> any),
+            remind_func: (() -> any()),
+            stop_func: (() -> boolean()),
             task_supervisor: pid()
           }
   end
@@ -26,24 +27,27 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
   """
   @spec start_link(
           {id :: any, interval :: non_neg_integer, send_reminder_fun :: (() -> any()),
-           opts :: GenServer.options()}
+           stop_func :: (() -> boolean()), opts :: GenServer.options()}
         ) ::
           {:ok, pid()} | {:error, any()}
-  def start_link({id, interval, send_reminder_fn}) do
-    start_link({id, interval, send_reminder_fn, []})
+  def start_link({id, interval, send_reminder_fn, stop_func}) do
+    start_link({id, interval, send_reminder_fn, stop_func, []})
   end
 
-  def start_link({id, interval, send_reminder_fn, opts}) do
-    GenServer.start_link(__MODULE__, {id, interval, send_reminder_fn}, opts)
+  def start_link({id, interval, send_reminder_fn, stop_func, opts}) do
+    GenServer.start_link(__MODULE__, {id, interval, send_reminder_fn, stop_func}, opts)
   end
 
   @impl true
-  @spec init({id :: any(), interval :: non_neg_integer, send_reminder_fn :: (() -> any)}) ::
+  @spec init(
+          {id :: any(), interval :: non_neg_integer, send_reminder_fn :: (() -> any),
+           stop_func :: (() -> boolean())}
+        ) ::
           {:ok, State.t()} | {:stop, any}
-  def init({id, interval, send_reminder_fn}) do
+  def init({id, interval, send_reminder_fn, stop_func}) do
     Logger.metadata(timer_id: id)
 
-    case make_initial_timer_state(interval, send_reminder_fn) do
+    case make_initial_timer_state(interval, send_reminder_fn, stop_func) do
       {:ok, state} -> {:ok, state}
       {:error, reason} -> {:stop, reason}
     end
@@ -52,9 +56,9 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
   @doc """
   Stop the timer agent. See `GenServer.stop/3` for more details.
   """
-  @spec stop(Agent.agent(), atom, non_neg_integer | :infinity) :: any
-  def stop(agent, reason \\ :normal, timeout \\ 5000) do
-    GenServer.stop(agent, reason, timeout)
+  @spec stop(GenServer.server(), atom, non_neg_integer | :infinity) :: any
+  def stop(server, reason \\ :normal, timeout \\ 5000) do
+    GenServer.stop(server, reason, timeout)
   end
 
   @doc """
@@ -98,14 +102,17 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
     {:reply, :ok, state}
   end
 
-  @spec make_initial_timer_state(number(), (() -> any())) :: {:ok, State.t()} | {:error, any()}
-  defp make_initial_timer_state(interval, send_reminder_fn) do
+  @spec make_initial_timer_state(number(), (() -> any()), (() -> boolean())) ::
+          {:ok, State.t()} | {:error, any()}
+  defp make_initial_timer_state(interval, send_reminder_fn, stop_fn) do
     with {:ok, supervisor_pid} <- Task.Supervisor.start_link(),
-         {:ok, timer_ref} <- RunInterval.apply_interval(interval, send_reminder_fn) do
+         {:ok, timer_ref} <-
+           RunInterval.apply_interval(interval, make_interval_action(send_reminder_fn, stop_fn)) do
       state = %State{
         timer: {:interval_timer, timer_ref},
         interval: interval,
         remind_func: send_reminder_fn,
+        stop_func: stop_fn,
         task_supervisor: supervisor_pid
       }
 
@@ -113,6 +120,19 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
     else
       err = {:error, _err} ->
         err
+    end
+  end
+
+  @spec make_interval_action((() -> any()), (() -> boolean())) :: (() -> any())
+  defp make_interval_action(send_reminder_fn, stop_fn) do
+    timer_pid = self()
+
+    fn ->
+      if stop_fn.() do
+        :ok = stop(timer_pid)
+      else
+        send_reminder_fn.()
+      end
     end
   end
 

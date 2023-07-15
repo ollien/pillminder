@@ -4,18 +4,20 @@ defmodule Pillminder.ReminderSender do
   many SendServers, one for each reminder.
   """
 
+  alias Pillminder.Util
   alias Pillminder.ReminderSender.TimerManager
   alias Pillminder.ReminderSender.SendServer
   use Supervisor
 
   @type sender_id :: String.t()
   @type senders :: %{sender_id => SendServer.remind_func()}
+  @type clock_source :: (() -> DateTime.t())
 
   @registry_name __MODULE__.Registry
   @task_supervisor_name __MODULE__.TaskSupervisor
 
-  def start_link(senders) do
-    Supervisor.start_link(__MODULE__, senders, name: __MODULE__)
+  def start_link({senders, opts}) do
+    Supervisor.start_link(__MODULE__, {senders, opts}, name: __MODULE__)
   end
 
   @doc """
@@ -25,7 +27,7 @@ defmodule Pillminder.ReminderSender do
   @spec send_reminder_on_interval(
           timer_id :: sender_id(),
           interval :: non_neg_integer | :infinity,
-          opts :: [send_immediately: boolean]
+          opts :: [send_immediately: boolean(), stop_time: DateTime.t()]
         ) :: :ok | {:error, :already_timing | any}
   def send_reminder_on_interval(timer_id, interval, opts \\ []) do
     call_send_server(timer_id, fn destination ->
@@ -76,8 +78,10 @@ defmodule Pillminder.ReminderSender do
     end
   end
 
-  def init(senders) do
-    send_servers = Enum.map(senders, &make_send_server_spec/1)
+  @impl true
+  def init({senders, opts}) do
+    configured_clock_source = Keyword.get(opts, :clock_source)
+    send_servers = Enum.map(senders, &make_send_server_spec(&1, configured_clock_source))
 
     children =
       [
@@ -89,15 +93,29 @@ defmodule Pillminder.ReminderSender do
     Supervisor.init(children, strategy: :one_for_one)
   end
 
-  @spec make_send_server_spec({sender_id, SendServer.remind_func()}) :: Supervisor.child_spec()
-  defp make_send_server_spec({timer_id, remind_func}) do
+  @spec make_send_server_spec({sender_id, SendServer.remind_func()}, clock_source() | nil) ::
+          Supervisor.child_spec()
+  defp make_send_server_spec({timer_id, remind_func}, maybe_clock_source) do
+    clock_source = clock_source_for_timer!(timer_id, maybe_clock_source)
+
     Supervisor.child_spec(
       {SendServer,
-       {remind_func, @task_supervisor_name,
+       {remind_func, @task_supervisor_name, clock_source,
         sender_id: make_send_server_id(timer_id),
         server_opts: [name: make_send_server_via_tuple(timer_id)]}},
       id: make_send_server_id(timer_id)
     )
+  end
+
+  defp clock_source_for_timer!(timer_id, nil) do
+    # Should never fail when run properly; we can't operate on a timer we don't know about
+    timer = Pillminder.lookup_timer!(timer_id)
+
+    fn -> Util.Time.now!(timer.reminder_time_zone) end
+  end
+
+  defp clock_source_for_timer!(_timer_id, configured_clock_source) do
+    configured_clock_source
   end
 
   defp call_send_server(timer_id, call) do

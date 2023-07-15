@@ -10,18 +10,24 @@ defmodule Pillminder.ReminderSender.SendServer do
 
   use GenServer
 
-  @type remind_func :: (() -> any)
+  @type clock_source :: (() -> DateTime.t())
+  @type remind_func :: (() -> any())
+  @type stop_func :: (() -> boolean())
   @type send_strategy :: :send_immediately | :wait_until_interval
-  @type send_server_opts :: [sender_id: String.t(), server_opts: GenServer.options()]
+  @type send_server_opts :: [
+          sender_id: String.t(),
+          server_opts: GenServer.options()
+        ]
 
   defmodule State do
-    @enforce_keys [:remind_func, :task_supervisor, :sender_id]
-    defstruct [:remind_func, :task_supervisor, :sender_id]
+    @enforce_keys [:remind_func, :task_supervisor, :sender_id, :clock_source]
+    defstruct [:remind_func, :task_supervisor, :sender_id, :clock_source]
 
     @type t :: %__MODULE__{
             remind_func: Pillminder.ReminderSender.SendServer.remind_func(),
             sender_id: String.t(),
-            task_supervisor: Supervisor.supervisor()
+            task_supervisor: Supervisor.supervisor(),
+            clock_source: Pillminder.ReminderSender.SendServer.clock_source()
           }
   end
 
@@ -37,15 +43,16 @@ defmodule Pillminder.ReminderSender.SendServer do
   """
 
   @spec start_link(
-          {remind_func, Supervisor.supervisor(), send_server_opts}
-          | {remind_func, Supervisor.supervisor(), send_server_opts}
+          {remind_func, Supervisor.supervisor(), clock_source(), send_server_opts}
+          | {remind_func, Supervisor.supervisor(), clock_source()}
         ) ::
           {:ok, pid} | {:error, any} | :ignore
-  def start_link({remind_func, task_supervisor}) when not is_list(task_supervisor) do
-    start_link({remind_func, task_supervisor, []})
+  def start_link({remind_func, task_supervisor, clock_source})
+      when not is_list(task_supervisor) do
+    start_link({remind_func, task_supervisor, clock_source, []})
   end
 
-  def start_link({remind_func, task_supervisor, opts}) when is_list(opts) do
+  def start_link({remind_func, task_supervisor, clock_source, opts}) when is_list(opts) do
     server_opts = Keyword.get(opts, :server_opts, [])
     full_opts = Keyword.put_new(server_opts, :name, __MODULE__)
 
@@ -54,7 +61,11 @@ defmodule Pillminder.ReminderSender.SendServer do
     sender_id =
       Keyword.get(opts, :sender_id, Keyword.get(server_opts, :name, __MODULE__)) |> stringify_id()
 
-    GenServer.start_link(__MODULE__, {remind_func, task_supervisor, sender_id}, full_opts)
+    GenServer.start_link(
+      __MODULE__,
+      {remind_func, task_supervisor, sender_id, clock_source},
+      full_opts
+    )
   end
 
   @doc """
@@ -63,7 +74,8 @@ defmodule Pillminder.ReminderSender.SendServer do
   """
   @spec send_reminder_on_interval(non_neg_integer | :infinity,
           server_name: GenServer.server(),
-          send_immediately: boolean
+          send_immediately: boolean(),
+          stop_time: DateTime.t()
         ) ::
           :ok | {:error, :already_timing | any}
   def send_reminder_on_interval(interval, opts \\ []) do
@@ -76,7 +88,12 @@ defmodule Pillminder.ReminderSender.SendServer do
         :wait_until_interval
       end
 
-    GenServer.call(destination, {:setup_reminder, interval, destination, send_strategy})
+    stop_time = Keyword.get(opts, :stop_time)
+
+    GenServer.call(
+      destination,
+      {:setup_reminder, interval, destination, send_strategy, stop_time}
+    )
   end
 
   @doc """
@@ -109,14 +126,16 @@ defmodule Pillminder.ReminderSender.SendServer do
   end
 
   @impl true
-  @spec init({remind_func, Supervisor.supervisor(), String.t()}) :: {:ok, State.t()}
-  def init({remind_func, task_supervisor, sender_id}) do
+  @spec init({remind_func, Supervisor.supervisor(), String.t(), clock_source()}) ::
+          {:ok, State.t()}
+  def init({remind_func, task_supervisor, sender_id, clock_source}) do
     Logger.metadata(sender_id: sender_id)
 
     initial_state = %State{
       sender_id: sender_id,
       remind_func: remind_func,
-      task_supervisor: task_supervisor
+      task_supervisor: task_supervisor,
+      clock_source: clock_source
     }
 
     {:ok, initial_state}
@@ -153,14 +172,19 @@ defmodule Pillminder.ReminderSender.SendServer do
   end
 
   @spec handle_call(
-          {:setup_reminder, non_neg_integer, GenServer.server(), send_strategy()},
+          {:setup_reminder, non_neg_integer, GenServer.server(), send_strategy(),
+           DateTime.t() | nil},
           {pid, term},
           State.t()
         ) ::
           {:reply, :ok, State.t()}
           | {:reply, {:error, :already_timing | any}, State.t()}
-  def handle_call({:setup_reminder, interval, destination, send_strategy}, _from, state) do
-    case setup_interval_reminder(interval, destination, send_strategy, state) do
+  def handle_call(
+        {:setup_reminder, interval, destination, send_strategy, maybe_stop_time},
+        _from,
+        state
+      ) do
+    case setup_interval_reminder(interval, destination, send_strategy, maybe_stop_time, state) do
       :ok ->
         {:reply, :ok, state}
 
@@ -172,8 +196,6 @@ defmodule Pillminder.ReminderSender.SendServer do
   @spec handle_call(:dismiss, {pid, term}, State.t()) ::
           {:reply, :ok | {:error, :not_timing | any}, State.t()}
   def handle_call(:dismiss, _from, state) do
-    Logger.debug("Dismissing timer")
-
     case TimerManager.cancel_timer(state.sender_id) do
       :ok -> {:reply, :ok, state}
       {:error, err} -> {:reply, {:error, err}, state}
@@ -201,19 +223,39 @@ defmodule Pillminder.ReminderSender.SendServer do
           number(),
           GenServer.server(),
           send_strategy(),
+          DateTime.t() | nil,
           State.t()
         ) :: :ok | {:error, any()}
-  defp setup_interval_reminder(interval, reminder_destination, send_strategy, state) do
+  defp setup_interval_reminder(
+         interval,
+         reminder_destination,
+         send_strategy,
+         maybe_stop_time,
+         state
+       ) do
     send_reminder_fn = fn ->
       # We want to time out the call once our next interval hits
       GenServer.call(reminder_destination, :remind, interval)
     end
 
+    stop_fn = fn ->
+      now = state.clock_source.()
+
+      case maybe_stop_time do
+        nil -> false
+        stop_time -> not Timex.before?(now, stop_time)
+      end
+    end
+
     with {_, :ok} <-
-           {:no_cleanup, make_reminder_timer(state.sender_id, interval, send_reminder_fn)},
+           {:no_cleanup,
+            make_reminder_timer(state.sender_id, interval, send_reminder_fn, stop_fn)},
          :ok <-
            perform_send_strategy_tasks(send_strategy, state.task_supervisor, send_reminder_fn) do
-      Logger.debug("Reminder timer for interval #{interval} has been stored and begun")
+      Logger.debug(
+        "Reminder timer for interval #{interval} (and stop time of #{maybe_stop_time}) has been stored and begun"
+      )
+
       :ok
     else
       {:no_cleanup, err = {:error, _reason}} ->
@@ -226,10 +268,10 @@ defmodule Pillminder.ReminderSender.SendServer do
     end
   end
 
-  @spec make_reminder_timer(String.t(), number(), remind_func()) ::
+  @spec make_reminder_timer(String.t(), number(), remind_func(), stop_func()) ::
           :ok | {:error, :already_timing | {:spawn_reminder_timer, any()}}
-  defp make_reminder_timer(id, interval, send_reminder_fn) do
-    case TimerManager.start_reminder_timer(id, interval, send_reminder_fn) do
+  defp make_reminder_timer(id, interval, send_reminder_fn, stop_fn) do
+    case TimerManager.start_reminder_timer(id, interval, send_reminder_fn, stop_fn) do
       :ok ->
         Logger.debug("Made reminder timer with interval #{interval}")
         :ok

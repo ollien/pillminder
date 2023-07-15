@@ -14,12 +14,25 @@ defmodule PillminderTest.ReminderSender do
     end
   end
 
+  defp start_sender!(remind_funcs, opts \\ []) do
+    default_opts = [
+      clock_source: fn -> ~U[2023-05-15 09:00:00.000Z] end
+    ]
+
+    start_supervised!({ReminderSender, {remind_funcs, Keyword.merge(default_opts, opts)}})
+  end
+
+  defp retry_until_alive(func) do
+    case func.() do
+      {:error, :no_timer} -> retry_until_alive(func)
+      val -> val
+    end
+  end
+
   test "calls target function when send_reminder is called" do
     {:ok, called_agent} = Agent.start_link(fn -> false end)
 
-    start_supervised!(
-      {ReminderSender, %{"reminder" => fn -> Agent.update(called_agent, fn _ -> true end) end}}
-    )
+    start_sender!(%{"reminder" => fn -> Agent.update(called_agent, fn _ -> true end) end})
 
     {:ok, :ok} = ReminderSender.send_reminder("reminder")
     was_called = Agent.get(called_agent, & &1)
@@ -30,18 +43,17 @@ defmodule PillminderTest.ReminderSender do
     {:ok, should_crash_agent} = Agent.start_link(fn -> true end)
     {:ok, called_agent} = Agent.start_link(fn -> false end)
 
-    start_supervised!({ReminderSender,
-     %{
-       "reminder" => fn ->
-         # On the first call, this will fail and we will crash deliberately
-         if Agent.get_and_update(should_crash_agent, fn value -> {value, false} end) do
-           :erlang.error(:deliberate_crash)
-         end
+    start_sender!(%{
+      "reminder" => fn ->
+        # On the first call, this will fail and we will crash deliberately
+        if Agent.get_and_update(should_crash_agent, fn value -> {value, false} end) do
+          :erlang.error(:deliberate_crash)
+        end
 
-         # On the second call, the :erlang.error should not occur and we will mark called as true
-         Agent.update(called_agent, fn _ -> true end)
-       end
-     }})
+        # On the second call, the :erlang.error should not occur and we will mark called as true
+        Agent.update(called_agent, fn _ -> true end)
+      end
+    })
 
     {:ok, :ok} = ReminderSender.send_reminder("reminder")
     was_called = Agent.get(called_agent, & &1)
@@ -51,7 +63,7 @@ defmodule PillminderTest.ReminderSender do
   test "can remind on interval" do
     proc = self()
     interval = 50
-    start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
+    start_sender!(%{"reminder" => fn -> send(proc, :called) end})
 
     :ok = ReminderSender.send_reminder_on_interval("reminder", interval)
 
@@ -59,10 +71,44 @@ defmodule PillminderTest.ReminderSender do
     assert_receive_on_interval(:called, interval * 2)
   end
 
+  test "stops reminding at/after the given stop time" do
+    proc = self()
+    interval = 50
+
+    {:ok, times_agent_pid} =
+      Agent.start_link(fn ->
+        [
+          ~U[2023-05-15 23:58:00.000Z],
+          ~U[2023-05-15 23:59:00.000Z],
+          ~U[2023-05-16 00:00:00.000Z],
+          ~U[2023-05-16 00:01:00.000Z]
+        ]
+      end)
+
+    start_sender!(
+      %{"reminder" => fn -> send(proc, :called) end},
+      clock_source: fn ->
+        Agent.get_and_update(times_agent_pid, fn [next | rest] -> {next, rest} end)
+      end
+    )
+
+    :ok =
+      ReminderSender.send_reminder_on_interval("reminder", interval,
+        stop_time: ~U[2023-05-16 00:00:00.000Z]
+      )
+
+    refute_receive(:called, interval - 10)
+    # Should be notified the first two times
+    assert_receive(:called, interval * 2)
+    assert_receive(:called, interval * 2)
+    # But once we hit midnight, stop
+    refute_receive(:called, interval * 4)
+  end
+
   test "can remind on interval and send immediately" do
     proc = self()
     interval = 50
-    start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
+    start_sender!(%{"reminder" => fn -> send(proc, :called) end})
 
     :ok = ReminderSender.send_reminder_on_interval("reminder", interval, send_immediately: true)
 
@@ -73,7 +119,7 @@ defmodule PillminderTest.ReminderSender do
   test "can not start interval twice" do
     proc = self()
 
-    start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
+    start_sender!(%{"reminder" => fn -> send(proc, :called) end})
 
     :ok = ReminderSender.send_reminder_on_interval("reminder", 50)
     {:error, :already_timing} = ReminderSender.send_reminder_on_interval("reminder", 50)
@@ -82,7 +128,7 @@ defmodule PillminderTest.ReminderSender do
   test "can cancel timer" do
     proc = self()
     interval = 50
-    start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
+    start_sender!(%{"reminder" => fn -> send(proc, :called) end})
 
     :ok = ReminderSender.send_reminder_on_interval("reminder", interval)
 
@@ -92,7 +138,7 @@ defmodule PillminderTest.ReminderSender do
   end
 
   test "cannot cancel when timer is not running" do
-    start_supervised!({ReminderSender, %{"reminder" => fn -> nil end}})
+    start_sender!(%{"reminder" => fn -> nil end})
     {:error, :not_timing} = ReminderSender.dismiss("reminder")
   end
 
@@ -100,7 +146,7 @@ defmodule PillminderTest.ReminderSender do
     proc = self()
     interval = 50
     snooze_time = interval * 2
-    start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
+    start_sender!(%{"reminder" => fn -> send(proc, :called) end})
     :ok = ReminderSender.send_reminder_on_interval("reminder", interval)
     :ok = ReminderSender.snooze("reminder", snooze_time)
 
@@ -116,7 +162,7 @@ defmodule PillminderTest.ReminderSender do
     proc = self()
     interval = 100
     snooze_time = div(interval, 2)
-    start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
+    start_sender!(%{"reminder" => fn -> send(proc, :called) end})
 
     :ok = ReminderSender.send_reminder_on_interval("reminder", interval)
     :ok = ReminderSender.snooze("reminder", 10000)
@@ -131,14 +177,14 @@ defmodule PillminderTest.ReminderSender do
   end
 
   test "cannot snooze with no running timer" do
-    start_supervised!({ReminderSender, %{"reminder" => fn -> nil end}})
+    start_sender!(%{"reminder" => fn -> nil end})
     {:error, :not_timing} = ReminderSender.snooze("reminder", 1000)
   end
 
   test "can cancel a snoozed timer" do
     proc = self()
     interval = 50
-    start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
+    start_sender!(%{"reminder" => fn -> send(proc, :called) end})
     :ok = ReminderSender.send_reminder_on_interval("reminder", interval)
     :ok = ReminderSender.snooze("reminder", interval)
     :ok = ReminderSender.dismiss("reminder")
@@ -149,7 +195,7 @@ defmodule PillminderTest.ReminderSender do
   test "continues to send interval reminder even if SendServer crashes" do
     proc = self()
     interval = 50
-    start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
+    start_sender!(%{"reminder" => fn -> send(proc, :called) end})
     :ok = ReminderSender.send_reminder_on_interval("reminder", interval, send_immediately: true)
 
     pid = ReminderSender._get_current_send_server_pid("reminder")
@@ -164,7 +210,7 @@ defmodule PillminderTest.ReminderSender do
   test "can cancel interval reminder even if SendServer crashes" do
     proc = self()
     interval = 100
-    start_supervised!({ReminderSender, %{"reminder" => fn -> send(proc, :called) end}})
+    start_sender!(%{"reminder" => fn -> send(proc, :called) end})
     :ok = ReminderSender.send_reminder_on_interval("reminder", interval, send_immediately: true)
 
     pid = ReminderSender._get_current_send_server_pid("reminder")
@@ -184,18 +230,11 @@ defmodule PillminderTest.ReminderSender do
   end
 
   test "does not crash for a non-existent sender" do
-    start_supervised!({ReminderSender, %{"reminder" => fn -> nil end}})
+    start_sender!(%{"reminder" => fn -> nil end})
 
     assert ReminderSender.send_reminder("non-existent") == {:error, :no_timer}
     assert ReminderSender.send_reminder_on_interval("non-existent", 100) == {:error, :no_timer}
     assert ReminderSender.dismiss("non-existent") == {:error, :no_timer}
     assert ReminderSender.snooze("non-existent", 1000) == {:error, :no_timer}
-  end
-
-  defp retry_until_alive(func) do
-    case func.() do
-      {:error, :no_timer} -> retry_until_alive(func)
-      val -> val
-    end
   end
 end
