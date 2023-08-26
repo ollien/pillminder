@@ -11,7 +11,7 @@ defmodule Pillminder.ReminderSender do
 
   @type sender_id :: String.t()
   @type senders :: %{sender_id => SendServer.remind_func()}
-  @type clock_source :: (() -> DateTime.t())
+  @type clock_source :: (-> DateTime.t())
 
   @registry_name __MODULE__.Registry
   @task_supervisor_name __MODULE__.TaskSupervisor

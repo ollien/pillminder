@@ -11,7 +11,7 @@ defmodule Pillminder.Scheduler do
   alias Pillminder.Util
   use Supervisor
 
-  @type clock_source :: (() -> DateTime.t())
+  @type clock_source :: (-> DateTime.t())
   @type init_options :: [clock_source: clock_source()]
 
   @task_supervisor_name __MODULE__.TaskSupervisor
@@ -116,6 +116,7 @@ defmodule Pillminder.Scheduler do
   @spec log_reminder_schedule(ScheduledReminder.t(), DateTime.t(), DateTime.t()) :: :ok
   defp log_reminder_schedule(reminder, now, schedule_time) do
     {:ok, ms_until} = get_ms_until(now, schedule_time)
+
     minutes_until = fn ->
       Timex.Duration.from_milliseconds(ms_until)
       |> Timex.Duration.to_minutes()

@@ -10,9 +10,9 @@ defmodule Pillminder.ReminderSender.SendServer do
 
   use GenServer
 
-  @type clock_source :: (() -> DateTime.t())
-  @type remind_func :: (() -> any())
-  @type stop_func :: (() -> boolean())
+  @type clock_source :: (-> DateTime.t())
+  @type remind_func :: (-> any())
+  @type stop_func :: (-> boolean())
   @type send_strategy :: :send_immediately | :wait_until_interval
   @type send_server_opts :: [
           sender_id: String.t(),

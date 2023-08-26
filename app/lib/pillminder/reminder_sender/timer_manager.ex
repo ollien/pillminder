@@ -12,7 +12,7 @@ defmodule Pillminder.ReminderSender.TimerManager do
   @timer_supervisor_name __MODULE__.TimerSupervisor
   @registry_name __MODULE__.Registry
 
-  @type stop_func :: (() -> boolean())
+  @type stop_func :: (-> boolean())
 
   @spec start_link(any) :: Supervisor.on_start()
   def start_link(_init) do

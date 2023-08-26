@@ -10,6 +10,6 @@ defmodule Pillminder.Scheduler.ScheduledReminder do
           id: String.t(),
           start_time: Pillminder.Scheduler.StartTime.start_time_func(),
           time_zone: Timex.Types.time_zone(),
-          scheduled_func: (() -> any())
+          scheduled_func: (-> any())
         }
 end

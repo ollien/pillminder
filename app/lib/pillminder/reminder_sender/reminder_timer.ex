@@ -15,8 +15,8 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
     @type t() :: %__MODULE__{
             timer: {:interval_timer | :snoozed_timer, :timer.tref()},
             interval: non_neg_integer(),
-            remind_func: (() -> any()),
-            stop_func: (() -> boolean()),
+            remind_func: (-> any()),
+            stop_func: (-> boolean()),
             task_supervisor: pid()
           }
   end
@@ -26,8 +26,8 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
   returned, the pid is guaranteed to be an agent with an already-running timer ref
   """
   @spec start_link(
-          {id :: any, interval :: non_neg_integer, send_reminder_fun :: (() -> any()),
-           stop_func :: (() -> boolean()), opts :: GenServer.options()}
+          {id :: any, interval :: non_neg_integer, send_reminder_fun :: (-> any()),
+           stop_func :: (-> boolean()), opts :: GenServer.options()}
         ) ::
           {:ok, pid()} | {:error, any()}
   def start_link({id, interval, send_reminder_fn, stop_func}) do
@@ -40,8 +40,8 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
 
   @impl true
   @spec init(
-          {id :: any(), interval :: non_neg_integer, send_reminder_fn :: (() -> any),
-           stop_func :: (() -> boolean())}
+          {id :: any(), interval :: non_neg_integer, send_reminder_fn :: (-> any),
+           stop_func :: (-> boolean())}
         ) ::
           {:ok, State.t()} | {:stop, any}
   def init({id, interval, send_reminder_fn, stop_func}) do
@@ -102,7 +102,7 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
     {:reply, :ok, state}
   end
 
-  @spec make_initial_timer_state(number(), (() -> any()), (() -> boolean())) ::
+  @spec make_initial_timer_state(number(), (-> any()), (-> boolean())) ::
           {:ok, State.t()} | {:error, any()}
   defp make_initial_timer_state(interval, send_reminder_fn, stop_fn) do
     with {:ok, supervisor_pid} <- Task.Supervisor.start_link(),
@@ -123,7 +123,7 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
     end
   end
 
-  @spec make_interval_action((() -> any()), (() -> boolean())) :: (() -> any())
+  @spec make_interval_action((-> any()), (-> boolean())) :: (-> any())
   defp make_interval_action(send_reminder_fn, stop_fn) do
     timer_pid = self()
 
@@ -136,7 +136,7 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
     end
   end
 
-  @spec reinitialize_after_snooze(State.t(), non_neg_integer(), (() -> any())) ::
+  @spec reinitialize_after_snooze(State.t(), non_neg_integer(), (-> any())) ::
           {:ok, State.t()} | {:error, {:unsnooze_failed, any()}}
   defp reinitialize_after_snooze(state, interval, remind_func) do
     case RunInterval.apply_interval(interval, remind_func) do
@@ -176,7 +176,7 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
     GenServer.call(destination, :unsnooze)
   end
 
-  @spec send_initial_unsnooze_message(pid(), (() -> any())) ::
+  @spec send_initial_unsnooze_message(pid(), (-> any())) ::
           {:ok, State.t()} | {:error, {:unsnooze_init_message_failed, any()}}
   defp send_initial_unsnooze_message(supervisor, remind_func) do
     case Task.Supervisor.start_child(supervisor, remind_func) do

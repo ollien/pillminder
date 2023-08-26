@@ -5,7 +5,7 @@ defmodule Pillminder.Auth.TokenAuthenticator do
   alias Pillminder.Util
   use Agent
 
-  @type clock_source :: (() -> DateTime.t())
+  @type clock_source :: (-> DateTime.t())
   @type token_data :: fixed_token_data() | dynamic_token_data()
   @type token_action :: :reject | :accept | :accept_and_delete
   @type fixed_token_data :: %{expires_at: :never, timer_id: :all, token_type: :fixed}

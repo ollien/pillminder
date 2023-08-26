@@ -7,7 +7,7 @@ defmodule Pillminder.Scheduler.SkipDate do
   alias Pillminder.Scheduler.ScheduledReminder
   alias Pillminder.Util
 
-  @type clock_source :: (() -> DateTime.t())
+  @type clock_source :: (-> DateTime.t())
   @type skip_entry :: Date.t()
   @type opts :: [clock_source: clock_source()]
 

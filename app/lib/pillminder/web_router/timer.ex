@@ -227,7 +227,7 @@ defmodule Pillminder.WebRouter.Timer do
     end
   end
 
-  @spec do_if(boolean, (() -> t)) :: :ok | t when t: any
+  @spec do_if(boolean, (-> t)) :: :ok | t when t: any
   defp do_if(true, func) do
     func.()
   end
