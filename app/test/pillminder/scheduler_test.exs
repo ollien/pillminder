@@ -35,13 +35,12 @@ defmodule PillminderTest.Scheduler do
           # This hack is silly but because the code calls clock_source thrice, we duplicate our
           # instances of the time given
           ~U[2022-05-15 09:00:00.000Z],
-          ~U[2022-05-15 09:00:00.000Z],
-          ~U[2022-05-15 09:00:00.000Z],
 
           # Reschedule
           ~U[2022-05-16 09:00:00.000Z],
-          ~U[2022-05-16 09:00:00.000Z],
-          ~U[2022-05-16 09:00:00.000Z]
+
+          # May be called if the code wins a race and runs (and thus reschedules again)
+          ~U[2022-05-17 09:00:00.000Z]
         ]
       end)
 
@@ -71,16 +70,12 @@ defmodule PillminderTest.Scheduler do
     {:ok, times_agent_pid} =
       Agent.start_link(fn ->
         [
-          # This hack is silly but because the code calls clock_source thrice, we duplicate our
-          # instances of the time given
-          ~U[2022-05-15 09:00:00.000Z],
-          ~U[2022-05-15 09:00:00.000Z],
           ~U[2022-05-15 09:00:00.000Z],
 
           # Reschedule
           ~U[2022-05-16 09:00:00.000Z],
-          ~U[2022-05-16 09:00:00.000Z],
-          ~U[2022-05-16 09:00:00.000Z]
+          # May be called if the code wins a race and runs (and thus reschedules again)
+          ~U[2022-05-16 09:00:01.000Z]
         ]
       end)
 
@@ -113,16 +108,11 @@ defmodule PillminderTest.Scheduler do
     {:ok, times_agent_pid} =
       Agent.start_link(fn ->
         [
-          # This hack is silly but because the code calls clock_source twice, we duplicate our
-          # instances of the time given
           ~U[2023-05-15 23:59:59.750Z],
-          ~U[2023-05-15 23:59:59.750Z],
-          ~U[2023-05-15 23:59:59.750Z],
-
-          # For the rescheduling; follows the same hack as before
+          # For the rescheduling
           ~U[2023-05-16 00:00:00.000Z],
-          ~U[2023-05-16 00:00:00.000Z],
-          ~U[2023-05-16 00:00:00.000Z]
+          # May be called if the code wins a race and runs (and thus reschedules again)
+          ~U[2023-05-16 00:00:00.250Z]
         ]
       end)
 
@@ -154,16 +144,12 @@ defmodule PillminderTest.Scheduler do
     {:ok, times_agent_pid} =
       Agent.start_link(fn ->
         [
-          # This hack is silly but because the code calls clock_source twice, we duplicate our
-          # instances of the time given
-          ~U[2023-05-15 09:00:00.000Z],
-          ~U[2023-05-15 09:00:00.000Z],
           ~U[2023-05-15 09:00:00.000Z],
 
-          # For the rescheduling; follows the same hack as before
+          # Rescheduling
           ~U[2023-05-16 08:59:59.500Z],
-          ~U[2023-05-16 08:59:59.500Z],
-          ~U[2023-05-16 08:59:59.500Z]
+          # May be called if the code wins a race and runs (and thus reschedules again)
+          ~U[2023-05-16 00:00:00.500Z]
         ]
       end)
 

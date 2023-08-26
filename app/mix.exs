@@ -40,7 +40,7 @@ defmodule Pillminder.MixProject do
       {:ecto_sqlite3, "~> 0.9.1"},
       {:secure_random, "~> 0.5"},
       {:quantum, "~> 3.0"},
-      {:briefly, "~> 0.3.0", only: [:test]},
+      {:briefly, "~> 0.4.1", only: [:test]},
       {:ex_parameterized, "~> 1.3", only: [:test]}
     ]
   end

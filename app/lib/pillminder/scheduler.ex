@@ -51,8 +51,7 @@ defmodule Pillminder.Scheduler do
 
       now = reminder_clock_source.()
       {:ok, schedule_time} = get_next_scheduleable_time(reminder, now)
-      {:ok, ms_until} = get_ms_until(now, schedule_time)
-      schedule_reminder(reminder, ms_until, reminder_clock_source)
+      schedule_reminder(reminder, now, schedule_time, reminder_clock_source)
     end)
   end
 
@@ -94,11 +93,13 @@ defmodule Pillminder.Scheduler do
 
   @spec schedule_reminder(
           ScheduledReminder.t(),
-          non_neg_integer(),
+          DateTime.t(),
+          DateTime.t(),
           clock_source()
         ) :: :ok
-  defp schedule_reminder(reminder, ms_until, clock_source) do
-    log_reminder_schedule(reminder, ms_until, clock_source)
+  defp schedule_reminder(reminder, now, schedule_time, clock_source) do
+    {:ok, ms_until} = get_ms_until(now, schedule_time)
+    log_reminder_schedule(reminder, now, schedule_time)
 
     {:ok, _} =
       :timer.apply_after(
@@ -106,21 +107,15 @@ defmodule Pillminder.Scheduler do
         :erlang,
         :apply,
         # We must use :erlang.apply if we want to use a private function here
-        [fn -> run_and_reschedule(reminder, clock_source) end, []]
+        [fn -> run_and_reschedule(reminder, now, clock_source) end, []]
       )
 
     :ok
   end
 
-  defp log_reminder_schedule(reminder, ms_until, clock_source) do
-    get_start_time = fn ->
-      duration_until = Timex.Duration.from_milliseconds(ms_until)
-      now = clock_source.()
-
-      # this is technically approximate but it's just for a log so it's not a big deal if it's slightly off
-      Timex.add(now, duration_until)
-    end
-
+  @spec log_reminder_schedule(ScheduledReminder.t(), DateTime.t(), DateTime.t()) :: :ok
+  defp log_reminder_schedule(reminder, now, schedule_time) do
+    {:ok, ms_until} = get_ms_until(now, schedule_time)
     minutes_until = fn ->
       Timex.Duration.from_milliseconds(ms_until)
       |> Timex.Duration.to_minutes()
@@ -128,13 +123,13 @@ defmodule Pillminder.Scheduler do
     end
 
     Logger.info(
-      "Scheduling reminder \"#{reminder.id}\" for #{get_start_time.() |> DateTime.truncate(:second)} (in #{minutes_until.()} minutes)"
+      "Scheduling reminder \"#{reminder.id}\" for #{schedule_time |> DateTime.truncate(:second)} (in #{minutes_until.()} minutes)"
     )
   end
 
-  @spec run_and_reschedule(ScheduledReminder.t(), clock_source()) :: nil
-  defp run_and_reschedule(reminder, clock_source) do
-    today = clock_source.() |> Timex.to_date()
+  @spec run_and_reschedule(ScheduledReminder.t(), DateTime.t(), clock_source()) :: nil
+  defp run_and_reschedule(reminder, now, clock_source) do
+    today = Timex.to_date(now)
 
     if SkipDate.is_skipped(reminder.id, today) do
       Logger.info("Reminder task for \"#{reminder.id}\" was skipped for today.")
@@ -194,7 +189,6 @@ defmodule Pillminder.Scheduler do
   defp reschedule_reminder(reminder, clock_source) do
     now = clock_source.()
     {:ok, schedule_time} = get_next_scheduleable_time(reminder, now)
-    {:ok, ms_until} = get_ms_until(now, schedule_time)
-    schedule_reminder(reminder, ms_until, clock_source)
+    schedule_reminder(reminder, now, schedule_time, clock_source)
   end
 end
