@@ -156,6 +156,7 @@ defmodule Pillminder.ReminderSender.SendServer do
 
           state.remind_func.()
         end,
+        retries: 4,
         delay: 250
       )
 

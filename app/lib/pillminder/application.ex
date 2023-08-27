@@ -58,7 +58,9 @@ defmodule Pillminder.Application do
           :ok
 
         {:error, reason} ->
-          Logger.error("Failed to send reminder notification for #{timer.id}: #{reason}")
+          error = "Failed to send reminder notification for #{timer.id}: #{inspect(reason)}"
+          Logger.error(error)
+          raise error
       end
     end
   end
