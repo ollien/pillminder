@@ -132,18 +132,11 @@ defmodule PillminderTest.Stats do
     end
 
     test "taking medication the next day (even if more than 24h) keeps a streak" do
-      base_taken_at = ~U[2022-12-10 10:32:00Z]
-
       taken_ats = [
-        base_taken_at,
-        base_taken_at
-        |> Timex.subtract(Timex.Duration.from_days(1)),
-        base_taken_at
-        |> Timex.subtract(Timex.Duration.from_days(2))
-        |> Timex.subtract(Timex.Duration.from_hours(6)),
-        base_taken_at
-        |> Timex.subtract(Timex.Duration.from_days(3))
-        |> Timex.subtract(Timex.Duration.from_hours(12))
+        ~U[2022-12-07 02:32:00Z],
+        ~U[2022-12-08 04:32:00Z],
+        ~U[2022-12-09 10:32:00Z],
+        ~U[2022-12-10 15:32:00Z]
       ]
 
       taken_ats
@@ -161,18 +154,11 @@ defmodule PillminderTest.Stats do
     end
 
     test "taking medication with a gap day but less than 48h apart breaks the streak" do
-      base_taken_at = ~U[2023-07-07 17:33:00Z]
-
       taken_ats = [
-        base_taken_at,
-        base_taken_at
-        |> Timex.add(Timex.Duration.from_days(1)),
-        base_taken_at
-        |> Timex.add(Timex.Duration.from_days(2))
-        |> Timex.add(Timex.Duration.from_hours(2)),
-        base_taken_at
-        |> Timex.add(Timex.Duration.from_days(4))
-        |> Timex.subtract(Timex.Duration.from_hours(2))
+        ~U[2023-07-07 17:33:00Z],
+        ~U[2023-07-08 17:33:00Z],
+        ~U[2023-07-09 19:33:00Z],
+        ~U[2023-07-11 15:33:00Z]
       ]
 
       taken_ats
@@ -187,6 +173,49 @@ defmodule PillminderTest.Stats do
       {:ok, streak_length} = Stats.streak_length("test-pillminder")
 
       assert streak_length == 1
+    end
+
+    test "two entries less than 24 hours apart still count as a streak of two" do
+      taken_ats = [
+        ~U[2023-08-14 21:04:00Z],
+        ~U[2023-08-21 20:04:00Z],
+        ~U[2023-08-22 16:31:00Z]
+      ]
+
+      taken_ats
+      |> Enum.each(fn taken_at ->
+        :ok =
+          Stats.record_taken(
+            "test-pillminder",
+            taken_at
+          )
+      end)
+
+      {:ok, streak_length} = Stats.streak_length("test-pillminder")
+
+      assert streak_length == 2
+    end
+
+    test "three entries, fewer than 24 hours apart from each other, will count as a streak of three" do
+      taken_ats = [
+        ~U[2023-08-14 21:04:00Z],
+        ~U[2023-08-21 20:04:00Z],
+        ~U[2023-08-22 16:31:00Z],
+        ~U[2023-08-23 09:31:00Z]
+      ]
+
+      taken_ats
+      |> Enum.each(fn taken_at ->
+        :ok =
+          Stats.record_taken(
+            "test-pillminder",
+            taken_at
+          )
+      end)
+
+      {:ok, streak_length} = Stats.streak_length("test-pillminder")
+
+      assert streak_length == 3
     end
 
     test "a gap in the streak produces the number of days after the gap" do

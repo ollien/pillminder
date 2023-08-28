@@ -91,8 +91,11 @@ defmodule Pillminder.Stats do
       {last_entry_before_gap(timer_id), most_recent_entry(timer_id)}
     end)
     |> case do
-      {:error, err} -> {:error, err}
-      {:ok, {streak_head, streak_tail}} -> {:ok, length_between_gaps(streak_head, streak_tail)}
+      {:error, err} ->
+        {:error, err}
+
+      {:ok, {streak_head, streak_tail}} ->
+        {:ok, length_between_gaps(streak_head, streak_tail)}
     end
   end
 
@@ -164,7 +167,10 @@ defmodule Pillminder.Stats do
   end
 
   defp length_between_gaps(streak_head, streak_tail) do
-    Timex.diff(streak_tail, streak_head, :days) + 1
+    head_date = Timex.to_date(streak_head)
+    tail_date = Timex.to_date(streak_tail)
+
+    Timex.diff(tail_date, head_date, :days) + 1
   end
 
   @spec most_recent_entry(String.t()) :: DateTime.t() | nil
@@ -203,9 +209,13 @@ defmodule Pillminder.Stats do
         %{
           taken_at: entry.taken_at,
           last_taken_at: entry.last_taken_at,
+          # Given we are comparing datetimes (and not dates, we want to use unixepoch) instead of
+          # juliandate, as juliandate can change the outcome based on whether or not the date itself
+          # is after noon (despite this being a common suggestion for date differences; we have this floor
+          # in here which negates some of the "cancelling out" that might occur)
           gap:
-            fragment("CAST(JULIANDAY(?) AS INTEGER)", entry.taken_at) -
-              fragment("CAST(JULIANDAY(?) AS INTEGER)", entry.last_taken_at)
+            fragment("CAST(UNIXEPOCH(?) / (24 * 60 * 60) AS INTEGER)", entry.taken_at) -
+              fragment("CAST(UNIXEPOCH(?) / (24 * 60 * 60) AS INTEGER)", entry.last_taken_at)
         }
       )
       |> Ecto.Query.order_by(desc: :taken_at)
