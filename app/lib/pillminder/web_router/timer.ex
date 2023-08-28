@@ -140,7 +140,7 @@ defmodule Pillminder.WebRouter.Timer do
       :ok
     else
       {:error, :already_taken_today} ->
-        Logger.warn("Medication marked as taken for #{timer_id} already today.")
+        Logger.warning("Medication marked as taken for #{timer_id} already today.")
 
         # I don't think we need to fail this endpoint necessarily, but we should definitely log about it.
         :ok
