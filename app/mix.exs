@@ -41,7 +41,8 @@ defmodule Pillminder.MixProject do
       {:secure_random, "~> 0.5"},
       {:quantum, "~> 3.0"},
       {:briefly, "~> 0.4.1", only: [:test]},
-      {:ex_parameterized, "~> 1.3", only: [:test]}
+      {:ex_parameterized, "~> 1.3", only: [:test]},
+      {:dialyxir, "~> 1.3", only: [:dev], runtime: false}
     ]
   end
 
