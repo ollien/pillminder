@@ -81,7 +81,6 @@ defmodule Pillminder.Scheduler do
     case Timex.diff(time, now, :milliseconds) |> Util.Error.ok_or() do
       {:ok, ms_until} ->
         {:ok, ms_until}
-        {:ok, ms_until}
 
       {:error, err} ->
         err_msg =
