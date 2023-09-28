@@ -1,7 +1,8 @@
 defmodule PillminderTest.Auth do
   alias Pillminder.Auth
 
-  use ExUnit.Case, async: true
+  # Cannot be async, due to several processes being named as __MODULE__
+  use ExUnit.Case
   doctest Pillminder.Auth
 
   describe "token_valid_for_timer? with fixed token" do

@@ -2,8 +2,6 @@ defmodule PillminderTest.Scheduler do
   alias Pillminder.Scheduler
 
   # Cannot be async, due to several processes being named as __MODULE__
-  # It's a lot of plumbing to make this work asynchronously
-  # TODO: add that plumbing
   use ExUnit.Case
 
   doctest Pillminder.Scheduler

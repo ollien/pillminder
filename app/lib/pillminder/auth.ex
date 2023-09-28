@@ -6,6 +6,7 @@ defmodule Pillminder.Auth do
 
   alias Pillminder.Auth.TokenAuthenticator
   alias Pillminder.Auth.Cleaner
+
   use Supervisor
 
   @access_code_length 6
