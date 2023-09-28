@@ -42,7 +42,16 @@ defmodule PillminderTest.Scheduler do
   end
 
   test "runs task at specified time" do
+    {clock_source, update_clock} =
+      make_clock_source(~U[2022-05-15 09:00:00.000Z], ~U[2022-05-15 09:00:00.250Z])
+
     this_pid = self()
+
+    schedule_func = fn ->
+      current_time = clock_source.()
+      update_clock.(&Timex.add(&1, Timex.Duration.from_days(1)))
+      send(this_pid, {:called, current_time})
+    end
 
     start_supervised!(
       {Scheduler,
@@ -51,14 +60,25 @@ defmodule PillminderTest.Scheduler do
            %{
              id: "my-timer",
              start_time: Scheduler.StartTime.next_possible(~T[09:00:00.250Z]),
-             scheduled_func: fn -> send(this_pid, :called) end
+             scheduled_func: schedule_func
            }
          ],
-         clock_source: fn -> ~U[2022-05-15 09:00:00.000Z] end
+         clock_source: clock_source
        }}
     )
 
-    assert_receive(:called, 500, "Scheduled func was not called")
+    clock_at_call =
+      receive do
+        {:called, time} -> time
+      after
+        500 ->
+          flunk("Scheduled func was not called")
+      end
+
+    assert(
+      clock_at_call == ~U[2022-05-15 09:00:00.250Z],
+      "Scheduled func was called at the wrong time"
+    )
   end
 
   test "reschedules itself to run again" do
@@ -92,7 +112,7 @@ defmodule PillminderTest.Scheduler do
 
   test "a crashing task is still rescheduled" do
     {clock_source, update_clock} =
-      make_clock_source(~U[2022-05-15 09:00:00.000Z], ~T[09:00:00.250Z])
+      make_clock_source(~U[2023-05-15 09:00:00.000Z], ~U[2023-05-15 09:00:00.250Z])
 
     this_pid = self()
 
@@ -127,7 +147,56 @@ defmodule PillminderTest.Scheduler do
     this_pid = self()
 
     schedule_func = fn ->
+      current_time = clock_source.()
       update_clock.(&Timex.add(&1, Timex.Duration.from_days(1)))
+      send(this_pid, {:called, current_time})
+    end
+
+    start_supervised!(
+      {Scheduler,
+       {
+         [
+           %{
+             id: "my-timer",
+             start_time: Scheduler.StartTime.next_possible(~T[00:00:00.000Z]),
+             scheduled_func: schedule_func
+           }
+         ],
+         clock_source: clock_source
+       }}
+    )
+
+    # its currently 23:59:59.750, so today's reminder has already gone off (at 00:00:00).
+    # We want to make sure the reminder at 00:00:00 (the next day) still goes off
+    Scheduler.dont_remind_today("my-timer", ~D[2023-05-15])
+
+    clock_at_call =
+      receive do
+        {:called, time} -> time
+      after
+        500 ->
+          flunk("Scheduled func was not called")
+      end
+
+    assert(
+      clock_at_call == ~U[2023-05-16 00:00:00.000Z],
+      "Scheduled func was called at the wrong time"
+    )
+  end
+
+  test "skipping today after a scheduled time still calls the next day" do
+    start_time = System.monotonic_time(:microsecond)
+    base_time = ~U[2023-05-15 23:59:59.750Z]
+
+    clock_source = fn ->
+      current_time = System.monotonic_time(:microsecond)
+      delta_us = current_time - start_time
+      base_time |> Timex.add(Timex.Duration.from_microseconds(delta_us))
+    end
+
+    this_pid = self()
+
+    schedule_func = fn ->
       send(this_pid, :called)
     end
 
@@ -148,7 +217,10 @@ defmodule PillminderTest.Scheduler do
     # its currently 23:59:59.750, so today's reminder has already gone off (at 00:00:00).
     # We want to make sure the reminder at 00:00:00 (the next day) still goes off
     Scheduler.dont_remind_today("my-timer", ~D[2023-05-15])
-    assert_receive(:called, 500, "Scheduled func was not called")
+
+    # If we don't get a call in 2s, we must have skipped today, because it should have only taken 250ms
+    # (this is a bit imperfect, since it's timing based, but a lot of tests in this project have to be :( )
+    assert_receive(:called, 2000, "Scheduled func was not called on the next day")
   end
 
   test "skipping today before a scheduled time forces a reschedule" do

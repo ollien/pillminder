@@ -106,7 +106,7 @@ defmodule Pillminder.Scheduler do
         :erlang,
         :apply,
         # We must use :erlang.apply if we want to use a private function here
-        [fn -> run_and_reschedule(reminder, now, clock_source) end, []]
+        [fn -> run_and_reschedule(reminder, clock_source) end, []]
       )
 
     :ok
@@ -127,9 +127,9 @@ defmodule Pillminder.Scheduler do
     )
   end
 
-  @spec run_and_reschedule(ScheduledReminder.t(), DateTime.t(), clock_source()) :: nil
-  defp run_and_reschedule(reminder, now, clock_source) do
-    today = Timex.to_date(now)
+  @spec run_and_reschedule(ScheduledReminder.t(), clock_source()) :: nil
+  defp run_and_reschedule(reminder, clock_source) do
+    today = clock_source.() |> Timex.to_date()
 
     if SkipDate.is_skipped(reminder.id, today) do
       Logger.info("Reminder task for \"#{reminder.id}\" was skipped for today.")
