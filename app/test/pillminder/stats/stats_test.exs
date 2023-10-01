@@ -108,13 +108,11 @@ defmodule PillminderTest.Stats do
     end
 
     test "a streak with no gap gives the length" do
-      base_taken_at = ~U[2022-12-10 10:32:00Z]
-
       taken_ats = [
-        base_taken_at,
-        base_taken_at |> Timex.subtract(Timex.Duration.from_days(1)),
-        base_taken_at |> Timex.subtract(Timex.Duration.from_days(2)),
-        base_taken_at |> Timex.subtract(Timex.Duration.from_days(3))
+        ~U[2022-12-10 10:32:00Z],
+        ~U[2022-12-09 10:32:00Z],
+        ~U[2022-12-08 10:32:00Z],
+        ~U[2022-12-07 10:32:00Z]
       ]
 
       taken_ats
@@ -129,6 +127,54 @@ defmodule PillminderTest.Stats do
       {:ok, streak_length} = Stats.streak_length("test-pillminder")
 
       assert streak_length == 4
+    end
+
+    test "the streak should not break if the UTC date is on different days" do
+      taken_ats = [
+        # These second and third are on the same day in UTC, but are on different days to a user
+        Timex.to_datetime({{2023, 9, 25}, {15, 0, 5}}, "America/New_York"),
+        Timex.to_datetime({{2023, 9, 26}, {22, 46, 44}}, "America/New_York"),
+        Timex.to_datetime({{2023, 9, 27}, {15, 2, 4}}, "America/New_York"),
+        Timex.to_datetime({{2023, 9, 28}, {15, 0, 38}}, "America/New_York")
+      ]
+
+      taken_ats
+      |> Enum.each(fn taken_at ->
+        :ok =
+          Stats.record_taken(
+            "test-pillminder",
+            taken_at
+          )
+      end)
+
+      {:ok, streak_length} = Stats.streak_length("test-pillminder")
+
+      assert streak_length == 4
+    end
+
+    test "the streak should not break if the UTC date is on different days, with the streak boundary being that date" do
+      taken_ats = [
+        # These second and third are on the same day in UTC, but are on different days to a user
+        Timex.to_datetime({{2023, 9, 24}, {15, 0, 5}}, "America/New_York"),
+        Timex.to_datetime({{2023, 9, 26}, {22, 46, 44}}, "America/New_York"),
+        Timex.to_datetime({{2023, 9, 27}, {15, 2, 4}}, "America/New_York"),
+        Timex.to_datetime({{2023, 9, 28}, {15, 0, 38}}, "America/New_York"),
+        Timex.to_datetime({{2023, 9, 29}, {13, 48, 43}}, "America/New_York"),
+        Timex.to_datetime({{2023, 9, 30}, {13, 26, 08}}, "America/New_York")
+      ]
+
+      taken_ats
+      |> Enum.each(fn taken_at ->
+        :ok =
+          Stats.record_taken(
+            "test-pillminder",
+            taken_at
+          )
+      end)
+
+      {:ok, streak_length} = Stats.streak_length("test-pillminder")
+
+      assert streak_length == 5
     end
 
     test "taking medication the next day (even if more than 24h) keeps a streak" do

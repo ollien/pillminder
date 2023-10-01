@@ -88,7 +88,14 @@ defmodule Pillminder.Stats do
   @spec streak_length(String.t()) :: {:ok, number()} | {:error, any()}
   def streak_length(timer_id) do
     Repo.transaction(fn ->
-      {last_entry_before_gap(timer_id), most_recent_entry(timer_id)}
+      with {:get_streak_head, {:ok, streak_head}} <-
+             {:get_streak_head, last_entry_before_gap(timer_id)},
+           {:get_streak_tail, {:ok, streak_tail}} <-
+             {:get_streak_tail, most_recent_entry(timer_id)} do
+        {streak_head, streak_tail}
+      else
+        {stage, {:error, reason}} -> {:error, {stage, reason}}
+      end
     end)
     |> case do
       {:error, err} ->
@@ -167,27 +174,30 @@ defmodule Pillminder.Stats do
   end
 
   defp length_between_gaps(streak_head, streak_tail) do
+    # We care about the literal day differences, any time of the day is as good as any
+    # to_date takes care of that (as long as we have proper timezones)
     head_date = Timex.to_date(streak_head)
     tail_date = Timex.to_date(streak_tail)
 
     Timex.diff(tail_date, head_date, :days) + 1
   end
 
-  @spec most_recent_entry(String.t()) :: DateTime.t() | nil
+  @spec most_recent_entry(String.t()) :: {:ok, DateTime.t() | nil} | {:error, any()}
   defp most_recent_entry(timer_id) do
     TakenLog
-    |> Ecto.Query.select([:taken_at])
+    |> Ecto.Query.select([:taken_at, :utc_offset])
     |> Ecto.Query.where(timer: ^timer_id)
     |> Ecto.Query.order_by(desc: :taken_at)
     |> Ecto.Query.limit(1)
     |> Repo.one()
     |> case do
-      nil -> nil
-      %{taken_at: taken_at} -> taken_at
+      nil -> {:ok, nil}
+      %{taken_at: taken_at, utc_offset: utc_offset} -> reattach_timezone(taken_at, utc_offset)
     end
   end
 
-  @spec last_entry_before_gap(String.t()) :: DateTime.t() | nil
+  # Find the last entry in the streak (i.e. "before the gap" in taking medication)
+  @spec last_entry_before_gap(String.t()) :: {:ok, DateTime.t() | nil} | {:error, any()}
   defp last_entry_before_gap(timer_id) do
     lag_query =
       TakenLog
@@ -196,6 +206,7 @@ defmodule Pillminder.Stats do
         [entry],
         %{
           taken_at: entry.taken_at,
+          utc_offset: entry.utc_offset,
           last_taken_at: lag(entry.taken_at, -1) |> over(:last_taken_window)
         }
       )
@@ -209,13 +220,24 @@ defmodule Pillminder.Stats do
         %{
           taken_at: entry.taken_at,
           last_taken_at: entry.last_taken_at,
+          utc_offset: entry.utc_offset,
           # Given we are comparing datetimes (and not dates, we want to use unixepoch) instead of
           # juliandate, as juliandate can change the outcome based on whether or not the date itself
           # is after noon (despite this being a common suggestion for date differences; we have this floor
           # in here which negates some of the "cancelling out" that might occur)
+          #
+          # Also, we include the offset because even though they should cancel ~integer math~ says they don't :)
           gap:
-            fragment("CAST(UNIXEPOCH(?) / (24 * 60 * 60) AS INTEGER)", entry.taken_at) -
-              fragment("CAST(UNIXEPOCH(?) / (24 * 60 * 60) AS INTEGER)", entry.last_taken_at)
+            fragment(
+              "CAST((UNIXEPOCH(?) + (? * 60 * 60)) / (24 * 60 * 60) AS INTEGER)",
+              entry.taken_at,
+              entry.utc_offset
+            ) -
+              fragment(
+                "CAST((UNIXEPOCH(?) + (? * 60 * 60)) / (24 * 60 * 60) AS INTEGER)",
+                entry.last_taken_at,
+                entry.utc_offset
+              )
         }
       )
       |> Ecto.Query.order_by(desc: :taken_at)
@@ -224,14 +246,14 @@ defmodule Pillminder.Stats do
     gap_query
     # I don't know why, but if I use [:taken_at] instead of binding it like this, the datetime
     # gets converted to a string for some reason.
-    |> Ecto.Query.select([entry], %{taken_at: entry.taken_at})
+    |> Ecto.Query.select([entry], %{taken_at: entry.taken_at, utc_offset: entry.utc_offset})
     # Either it will be the last entry (indicating a nil gap), or there will be a space between two days
     |> Ecto.Query.where([entry], is_nil(entry.gap) or entry.gap > 1)
     |> Ecto.Query.limit(1)
     |> Repo.one()
     |> case do
-      nil -> nil
-      %{taken_at: taken_at} -> taken_at
+      nil -> {:ok, nil}
+      %{taken_at: taken_at, utc_offset: utc_offset} -> reattach_timezone(taken_at, utc_offset)
     end
   end
 
