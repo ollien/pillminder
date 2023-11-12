@@ -63,7 +63,7 @@ config :pillminder,
       # optional, a "fudge time", expressed seconds. If specified, your #
       # reminders will start at the specified start time, plus a random number of
       # seconds, with an upper bound of the specified fudge time
-      reminder_start_fudge_time: 10 * 60
+      reminder_start_time_fudge: 10 * 60
     ]
   ],
   # The base address that all URLs in notifications will be based on
