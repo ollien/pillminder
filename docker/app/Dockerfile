@@ -1,4 +1,4 @@
-FROM elixir:1.15-otp-25 AS build
+FROM elixir:1.16 AS build
 
 COPY app /app
 WORKDIR /app
