@@ -9,14 +9,13 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
   use GenServer
 
   defmodule State do
-    @enforce_keys [:timer, :interval, :remind_func, :stop_func, :task_supervisor]
-    defstruct [:timer, :interval, :remind_func, :stop_func, :task_supervisor]
+    @enforce_keys [:timer, :interval, :remind_func, :task_supervisor]
+    defstruct [:timer, :interval, :remind_func, :task_supervisor]
 
     @type t() :: %__MODULE__{
             timer: {:interval_timer | :snoozed_timer, :timer.tref()},
             interval: non_neg_integer(),
             remind_func: (-> any()),
-            stop_func: (-> boolean()),
             task_supervisor: pid()
           }
   end
@@ -98,21 +97,22 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
     send_initial_unsnooze_message(state.task_supervisor, state.remind_func)
 
     # If this fails, we have neither of our timers running and crashing is the best we can do
-    {:ok, state} = reinitialize_after_snooze(state, state.interval, state.remind_func)
+    {:ok, state} = reinitialize_after_snooze(state)
     {:reply, :ok, state}
   end
 
   @spec make_initial_timer_state(number(), (-> any()), (-> boolean())) ::
           {:ok, State.t()} | {:error, any()}
   defp make_initial_timer_state(interval, send_reminder_fn, stop_fn) do
+    remind_func = make_interval_action(send_reminder_fn, stop_fn)
+
     with {:ok, supervisor_pid} <- Task.Supervisor.start_link(),
          {:ok, timer_ref} <-
-           RunInterval.apply_interval(interval, make_interval_action(send_reminder_fn, stop_fn)) do
+           RunInterval.apply_interval(interval, remind_func) do
       state = %State{
         timer: {:interval_timer, timer_ref},
         interval: interval,
-        remind_func: send_reminder_fn,
-        stop_func: stop_fn,
+        remind_func: remind_func,
         task_supervisor: supervisor_pid
       }
 
@@ -123,6 +123,7 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
     end
   end
 
+  # Wrap the reminder func with stop_fn so that we handle stop this timer as needed
   @spec make_interval_action((-> any()), (-> boolean())) :: (-> any())
   defp make_interval_action(send_reminder_fn, stop_fn) do
     timer_pid = self()
@@ -136,10 +137,10 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
     end
   end
 
-  @spec reinitialize_after_snooze(State.t(), non_neg_integer(), (-> any())) ::
+  @spec reinitialize_after_snooze(State.t()) ::
           {:ok, State.t()} | {:error, {:unsnooze_failed, any()}}
-  defp reinitialize_after_snooze(state, interval, remind_func) do
-    case RunInterval.apply_interval(interval, remind_func) do
+  defp reinitialize_after_snooze(state) do
+    case RunInterval.apply_interval(state.interval, state.remind_func) do
       {:ok, timer} ->
         updated_state = Map.put(state, :timer, {:interval_timer, timer})
         {:ok, updated_state}

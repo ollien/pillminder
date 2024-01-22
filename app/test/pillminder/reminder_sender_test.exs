@@ -105,6 +105,84 @@ defmodule PillminderTest.ReminderSender do
     refute_receive(:called, interval * 4)
   end
 
+  test "stops reminding at/after the given stop time, even after a snooze" do
+    proc = self()
+    interval = 50
+
+    {:ok, times_agent_pid} =
+      Agent.start_link(fn ->
+        [
+          ~U[2023-05-15 23:57:00.000Z],
+          ~U[2023-05-15 23:57:00.000Z],
+          # skipped from the snooze
+          ~U[2023-05-15 23:59:00.000Z],
+          ~U[2023-05-16 00:01:00.000Z]
+        ]
+      end)
+
+    start_sender!(
+      %{"reminder" => fn -> send(proc, :called) end},
+      clock_source: fn ->
+        Agent.get_and_update(times_agent_pid, fn [next | rest] -> {next, rest} end)
+      end
+    )
+
+    :ok =
+      ReminderSender.send_reminder_on_interval("reminder", interval,
+        stop_time: ~U[2023-05-16 00:00:00.000Z]
+      )
+
+    refute_receive(:called, interval - 10)
+    # Should be notified the first two times
+    assert_receive(:called, interval * 2)
+    assert_receive(:called, interval * 2)
+
+    ReminderSender.snooze("reminder", interval * 2)
+
+    # One more after the snooze
+    assert_receive(:called, interval * 4)
+
+    # But once we hit midnight, stop
+    refute_receive(:called, interval * 4)
+  end
+
+  test "should not send the initial unsnooze message if that time is after the stop time" do
+    proc = self()
+    interval = 50
+
+    {:ok, times_agent_pid} =
+      Agent.start_link(fn ->
+        [
+          ~U[2023-05-15 23:57:00.000Z],
+          ~U[2023-05-15 23:57:00.000Z],
+          # snooze time
+          ~U[2023-05-16 00:01:00.000Z]
+        ]
+      end)
+
+    start_sender!(
+      %{"reminder" => fn -> send(proc, :called) end},
+      clock_source: fn ->
+        Agent.get_and_update(times_agent_pid, fn [next | rest] -> {next, rest} end)
+      end
+    )
+
+    :ok =
+      ReminderSender.send_reminder_on_interval("reminder", interval,
+        stop_time: ~U[2023-05-16 00:00:00.000Z]
+      )
+
+    refute_receive(:called, interval - 10)
+    # Should be notified the first two times
+    assert_receive(:called, interval * 2)
+    assert_receive(:called, interval * 2)
+
+    ReminderSender.snooze("reminder", interval * 2)
+
+    # once we hit midnight, stop, even for the kickoff message
+    refute_receive(:called, interval * 4)
+  end
+
   test "can remind on interval and send immediately" do
     proc = self()
     interval = 50
