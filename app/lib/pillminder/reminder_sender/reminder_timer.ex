@@ -56,7 +56,7 @@ defmodule Pillminder.ReminderSender.ReminderTimer do
   @doc """
   Stop the timer agent. See `GenServer.stop/3` for more details.
   """
-  @spec stop(GenServer.server(), atom, non_neg_integer | :infinity) :: any
+  @spec stop(GenServer.server(), atom, non_neg_integer | :infinity) :: :ok
   def stop(server, reason \\ :normal, timeout \\ 5000) do
     GenServer.stop(server, reason, timeout)
   end

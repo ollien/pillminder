@@ -248,9 +248,7 @@ defmodule Pillminder.ReminderSender.SendServer do
       end
     end
 
-    with {_, :ok} <-
-           {:no_cleanup,
-            make_reminder_timer(state.sender_id, interval, send_reminder_fn, stop_fn)},
+    with :ok <- make_reminder_timer(state.sender_id, interval, send_reminder_fn, stop_fn),
          :ok <-
            perform_send_strategy_tasks(send_strategy, state.task_supervisor, send_reminder_fn) do
       Logger.debug(
@@ -259,12 +257,9 @@ defmodule Pillminder.ReminderSender.SendServer do
 
       :ok
     else
-      {:no_cleanup, err = {:error, _reason}} ->
-        err
-
       err = {:error, _reason} ->
-        # This really shouldn't fail, as we have just created the timer
-        :ok = TimerManager.cancel_timer(state.sender_id)
+        # It doesn't matter if this fails; it can only fail if the timer doesn't exist, which is fine.
+        TimerManager.cancel_timer(state.sender_id)
         err
     end
   end
